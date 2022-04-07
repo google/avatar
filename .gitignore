@@ -1,0 +1,8 @@
+venv/
+.eggs/
+build/
+dist/
+*.egg-info/
+__pycache__/
+blueberry/*
+!blueberry/__init__.py
