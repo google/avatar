@@ -1,0 +1,3 @@
+[submodule "bt-test-interfaces"]
+	path = bt-test-interfaces
+	url = sso://blueberry/bt-test-interfaces
