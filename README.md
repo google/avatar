@@ -17,5 +17,5 @@ inv build-grpc
 ## Usage
 
 ```bash
-python3 examples/example.py --address ADDRESS
+python3 examples/example.py -c examples/example_config.yml
 ```

@@ -1,24 +1,21 @@
-import argparse
-import asyncio
+import logging
 
-from dut2ref.client import BumbleClient
+from mobly import suite_runner
+
+from dut2ref.test import DutToRefTest
 
 
-async def main():
-    parser = argparse.ArgumentParser(description="Trigger an ACL connection")
-    parser.add_argument('-a', '--address',
-                        type=str,
-                        required=True,
-                        help='Peer Bluetooth Classic address')
-    args = parser.parse_args()
+class ExampleTest(DutToRefTest):
 
-    ref = BumbleClient()
-    await ref.open()
-    local_address = await ref.read_local_address()
-    print(local_address)
-    await ref.connect(str(args.address))
-    await ref.close()
+    def test_print_addresses(self):
+        dut_address = self.dut.bt.read_local_address()
+        self.dut.log.info(f'Address: {dut_address}')
+        ref_address = self.ref.read_local_address()
+        self.ref.log.info(f'Address: {ref_address}')
 
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    logging.basicConfig(level=logging.DEBUG)
+    # Use suite runner since test runner does not work with superclass of
+    # mobly.base_test.BaseTestClass.
+    suite_runner.run_suite([ExampleTest])

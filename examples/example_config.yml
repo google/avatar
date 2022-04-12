@@ -1,0 +1,7 @@
+---
+
+TestBeds:
+- Name: ExampleTest
+  Controllers:
+    AndroidDevice: '*'
+    BumbleDevice: '*'
