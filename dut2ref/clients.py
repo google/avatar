@@ -23,6 +23,9 @@ class BaseClient:
         read_local_address_response = self.host.ReadLocalAddress()
         return Address(read_local_address_response.address)
 
+    def connect(self, address):
+        return self.host.Connect(address=bytes(address)).connection
+
 
 class BumbleClient(BaseClient):
 
