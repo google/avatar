@@ -1,4 +1,4 @@
-# Blueberry DUT-to-reference tests
+# Pandora DUT-to-reference tests
 
 ## Install
 

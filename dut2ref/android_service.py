@@ -5,7 +5,7 @@ from mobly.controllers.android_device_lib.services.base_service \
 
 from dut2ref.clients import AndroidClient
 
-ANDROID_SERVER_PACKAGE = 'com.android.blueberry'
+ANDROID_SERVER_PACKAGE = 'com.android.pandora'
 
 
 class AndroidService(AndroidClient, BaseService):
@@ -20,7 +20,7 @@ class AndroidService(AndroidClient, BaseService):
         return self._is_alive
 
     def start(self):
-        # Start Blueberry Android gRPC server.
+        # Start Pandora Android gRPC server.
         self._device.adb._exec_adb_cmd(
             'shell',
             f'am instrument -r -e Debug false {ANDROID_SERVER_PACKAGE}/.Main',
@@ -40,7 +40,7 @@ class AndroidService(AndroidClient, BaseService):
     def stop(self):
         self.close()
 
-        # Stop Blueberry Android gRPC server.
+        # Stop Pandora Android gRPC server.
         self._device.adb._exec_adb_cmd(
             'shell',
             f'am force-stop {ANDROID_SERVER_PACKAGE}',

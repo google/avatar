@@ -1,3 +1,3 @@
 [submodule "proto"]
 	path = proto
-	url = sso://blueberry/bt-test-interfaces
+	url = sso://pandora/bt-test-interfaces

@@ -13,8 +13,8 @@ class DutToRefTest(base_test.BaseTestClass):
         self.android_devices = self.register_controller(android_device)
         self.dut = self.android_devices[0]
 
-        self.dut.services.register('blueberry', AndroidService)
-        self.dut.bt = self.dut.services.blueberry
+        self.dut.services.register('pandora', AndroidService)
+        self.dut.bt = self.dut.services.pandora
 
         self.bumble_devices = self.register_controller(bumble_controller)
         self.ref = self.bumble_devices[0]

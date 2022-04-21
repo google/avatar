@@ -12,8 +12,8 @@ os.environ["PATH"] = package_directory + ':' + os.environ["PATH"]
 def build_grpc(ctx):
     proto_include = pkg_resources.resource_filename('grpc_tools', '_proto')
 
-    files = [f'blueberry/{f}' for f in os.listdir(
-        'proto/blueberry') if f.endswith('.proto')]
+    files = [f'pandora/{f}' for f in os.listdir(
+        'proto/pandora') if f.endswith('.proto')]
 
     protoc.main([
         'grpc_tools.protoc',

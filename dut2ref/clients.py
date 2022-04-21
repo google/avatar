@@ -1,6 +1,6 @@
 import grpc
 
-from blueberry.host_grpc import Host
+from pandora.host_grpc import Host
 from dut2ref.utils import Address
 
 BUMBLE_SERVER_PORT = 7999

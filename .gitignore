@@ -4,5 +4,5 @@ build/
 dist/
 *.egg-info/
 __pycache__/
-blueberry/*
-!blueberry/__init__.py
+pandora/*
+!pandora/__init__.py
