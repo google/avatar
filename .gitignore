@@ -1,8 +1,2 @@
 venv/
-.eggs/
-build/
-dist/
-*.egg-info/
 __pycache__/
-pandora/*
-!pandora/__init__.py

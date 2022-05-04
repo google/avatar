@@ -3,19 +3,22 @@
 ## Install
 
 ```bash
-python3 -m venv venv
-. venv/bin/activate.fish # or any other shell
-pip install -e .[development]
+git submodule update --init
+python -m venv venv
+source venv/bin/activate.fish # or any other shell
+pip install [-e] bt-test-interfaces/python
+pip install [-e] .
 ```
 
-## Build gRPC test interfaces
+## Rebuild gRPC Bluetooth test interfaces
 
 ```bash
-inv build-grpc
+pip install grpcio-tools==1.46.3
+./bt-test-interfaces/python/_build/grpc.py
 ```
 
 ## Usage
 
 ```bash
-python3 examples/example.py -c examples/example_config.yml
+python examples/example.py -c examples/example_config.yml
 ```

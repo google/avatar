@@ -1,3 +1,14 @@
+[project]
+name = "dut2ref"
+authors = [{name = "Pandora", email = "pandora-core@google.com"}]
+readme = "README.md"
+dynamic = ["version", "description"]
+dependencies = [
+    "bt-test-interfaces",
+    "grpcio>=1.41",
+    "mobly>=1.11.1"
+]
+
 [build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
+requires = ["flit_core==3.7.1"]
+build-backend = "flit_core.buildapi"
