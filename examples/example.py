@@ -1,24 +1,29 @@
 import logging
 
-from mobly import suite_runner, asserts
+from mobly import test_runner, base_test, asserts
+
 from grpc import RpcError
 
-from dut2ref.test import DutToRefTest
+from dut2ref.controllers import pandora_device
 
 
-class ExampleTest(DutToRefTest):
+class ExampleTest(base_test.BaseTestClass):
+    def setup_class(self):
+        self.pandora_devices = self.register_controller(pandora_device)
+        self.dut = self.pandora_devices[0]
+        self.ref = self.pandora_devices[1]
 
     def test_print_addresses(self):
-        dut_address = self.dut.bt.read_local_address()
+        dut_address = self.dut.address
         self.dut.log.info(f'Address: {dut_address}')
-        ref_address = self.ref.read_local_address()
+        ref_address = self.ref.address
         self.ref.log.info(f'Address: {ref_address}')
 
     def test_classic_connect(self):
-        dut_address = self.dut.bt.read_local_address()
+        dut_address = self.dut.address
         self.dut.log.info(f'Address: {dut_address}')
         try:
-            self.ref.connect(address=dut_address)
+            self.ref.host.Connect(address=dut_address)
         except RpcError as error:
             self.dut.log.error(error)
             asserts.assert_true(False, 'gRPC Error')
@@ -26,6 +31,4 @@ class ExampleTest(DutToRefTest):
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
-    # Use suite runner since test runner does not work with superclass of
-    # mobly.base_test.BaseTestClass.
-    suite_runner.run_suite([ExampleTest])
+    test_runner.main()

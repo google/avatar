@@ -27,8 +27,7 @@ class AndroidService(BaseService):
             timeout=None,
             stderr=None)
 
-        self._device.adb.forward(
-            [f'tcp:{self.port}', f'tcp:{ANDROID_SERVER_GRPC_PORT}'])
+        self._device.adb.forward([f'tcp:{self.port}', f'tcp:{ANDROID_SERVER_GRPC_PORT}'])
 
         # Wait a few seconds for the Android gRPC server to be started.
         time.sleep(3)
