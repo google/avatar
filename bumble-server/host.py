@@ -12,6 +12,8 @@ class HostService(HostServicer):
 
     def __init__(self, device):
         self.device = device
+        self.device.pairing_config_factory = lambda connection: PairingConfig(
+            bonding=False)
 
     async def ReadLocalAddress(self, request, context):
         logging.info('ReadLocalAddress')
