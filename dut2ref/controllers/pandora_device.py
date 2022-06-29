@@ -106,6 +106,10 @@ class BumblePandoraDevice(PandoraDevice):
         self.loop.call_soon_threadsafe(lambda: self.loop.stop())
         self.thread.join()
 
+    @property
+    def device(self):
+        return self.server.device
+
     @classmethod
     def create(cls, transport, **kwargs):
         loop = asyncio.get_event_loop()
