@@ -33,9 +33,10 @@ class ClassicConnect(base_test.BaseTestClass):
         self.bumble.device.pairing_config_factory = lambda _: PairingConfig(
             delegate=Delegate(io_cap, self.dut, bumble_address)
         )
-        result = self.bumble.host.Connect(
+        connect_resp = self.bumble.host.Connect(
             address=self.dut.address, wait_for_ready=True)
-        asserts.assert_true(result.connection is not None, "Failed to connect")
+        asserts.assert_true(connect_resp.WhichOneof(
+            "result") == "connection", "Failed to connect")
 
 
 class Delegate(PairingDelegate):
@@ -48,12 +49,12 @@ class Delegate(PairingDelegate):
 
   async def get_number(self):
     logging.info("get_number")
-    passkey = self._dut.host.ReadPasskey(address=self._address)
+    passkey = self._dut.host.ReadPasskey(address=self._address).passkey
     return passkey
 
   async def compare_numbers(self, number, digits=6):
     logging.info("compare_number")
-    dut_passkey = self._dut.host.ReadPasskey(address=self._address)
+    dut_passkey = self._dut.host.ReadPasskey(address=self._address).passkey
     return dut_passkey == number
 
 

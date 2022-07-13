@@ -40,9 +40,10 @@ class HostService(HostServicer):
             await self.device.encrypt(connection)
             logging.info("Encryption on")
 
+            logging.info(f"Connect: connection handle: {connection.handle}")
+            connection_handle = connection.handle.to_bytes(4, 'big')
+            return ConnectResponse(connection=Connection(cookie=connection_handle))
+
         except Exception as error:
             logging.error(error)
-
-        logging.info(connection.handle)
-        connection_handle = connection.handle.to_bytes(4, 'big')
-        return ConnectResponse(connection=Connection(cookie=connection_handle))
+            return ConnectResponse()
