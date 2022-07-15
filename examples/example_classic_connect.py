@@ -2,7 +2,7 @@ import logging
 
 from mobly import suite_runner, asserts, base_test
 
-from dut2ref.controllers import pandora_device
+from avatar.controllers import pandora_device
 
 from bumble.smp import PairingDelegate, PairingConfig
 

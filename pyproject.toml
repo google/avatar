@@ -1,5 +1,5 @@
 [project]
-name = "dut2ref"
+name = "avatar"
 authors = [{name = "Pandora", email = "pandora-core@google.com"}]
 readme = "README.md"
 dynamic = ["version", "description"]

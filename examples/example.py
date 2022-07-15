@@ -1,10 +1,9 @@
 import logging
 
 from mobly import test_runner, base_test, asserts
-
 from grpc import RpcError
 
-from dut2ref.controllers import pandora_device
+from avatar.controllers import pandora_device
 
 
 class ExampleTest(base_test.BaseTestClass):

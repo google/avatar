@@ -1,4 +1,8 @@
-# Pandora DUT-to-reference tests
+# Avatar
+
+Avatar aims to provide a scalable multi-platform Bluetooth testing tool capable
+of running any Bluetooth test cases virtually and physically. It aims to
+complete PTS-bot in the Pandora testing suite.
 
 ## Install
 
@@ -7,6 +11,7 @@ git submodule update --init
 python -m venv venv
 source venv/bin/activate.fish # or any other shell
 pip install [-e] bt-test-interfaces/python
+pip install [-e] bumble
 pip install [-e] .
 ```
 
