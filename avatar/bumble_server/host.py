@@ -1,11 +1,11 @@
 import logging
 
 from bumble.core import BT_BR_EDR_TRANSPORT
-from bumble.hci import Address
+from bumble.hci import Address, HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR
 from bumble.smp import PairingConfig
 
 from pandora.host_pb2 import ReadLocalAddressResponse, ConnectResponse, \
-    Connection
+    Connection, DisconnectResponse, GetConnectionResponse
 from pandora.host_grpc import HostServicer
 
 
@@ -47,3 +47,30 @@ class HostService(HostServicer):
         except Exception as error:
             logging.error(error)
             return ConnectResponse()
+
+    async def Disconnect(self, request, context):
+        # Need to reverse bytes order since Bumble Address is using MSB.
+        connection_handle = int.from_bytes(request.connection.cookie,'big')
+        logging.info(f"Disconnect: {connection_handle}")
+
+        try:
+            logging.info("Disconnecting...")
+            connection = self.device.lookup_connection(connection_handle)
+            await connection.disconnect(HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR)
+        except Exception as error:
+            logging.error(error)
+
+        return DisconnectResponse()
+
+    async def GetConnection(self, request, context):
+        address = Address(bytes(reversed(request.address)))
+        logging.info(f"GetConnection: {address}")
+
+        try:
+            connection_handle = self.device.find_connection_by_bd_addr(
+                address).handle.to_bytes(4, 'big')
+            return GetConnectionResponse(connection=Connection(cookie=connection_handle))
+
+        except Exception as error:
+            logging.error(error)
+            return GetConnectionResponse()
