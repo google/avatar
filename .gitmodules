@@ -2,5 +2,5 @@
 	path = bt-test-interfaces
 	url = sso://pandora/bt-test-interfaces
 [submodule "bumble"]
-	path = bumble
+	path = third-party/bumble
 	url = sso://pandora/third_party/bumble

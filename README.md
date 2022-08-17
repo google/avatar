@@ -11,7 +11,7 @@ git submodule update --init
 python -m venv venv
 source venv/bin/activate.fish # or any other shell
 pip install [-e] bt-test-interfaces/python
-pip install [-e] bumble
+pip install [-e] third-party/bumble
 pip install [-e] .
 ```
 
