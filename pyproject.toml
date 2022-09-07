@@ -7,7 +7,7 @@ dependencies = [
     "bt-test-interfaces",
     "bumble",
     "grpcio>=1.41",
-    "mobly>=1.11.1"
+    "mobly>=1.12"
 ]
 
 [build-system]

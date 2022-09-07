@@ -25,5 +25,5 @@ pip install grpcio-tools==1.46.3
 ## Usage
 
 ```bash
-python examples/example.py -c examples/example_config.yml
+python examples/example.py -c examples/example_config.yml --verbose
 ```
