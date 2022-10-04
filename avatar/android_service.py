@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import time
+import threading
 
 from mobly.controllers.android_device_lib.services.base_service \
     import BaseService
@@ -34,12 +35,15 @@ class AndroidService(BaseService):
 
     def start(self):
         # Start Pandora Android gRPC server.
-        self._device.adb._exec_adb_cmd(
-            'shell',
-            f'am instrument -r -e Debug false {ANDROID_SERVER_PACKAGE}/.Main',
-            shell=False,
-            timeout=None,
-            stderr=None)
+        self.instrumentation = threading.Thread(
+            target=lambda: self._device.adb._exec_adb_cmd(
+                'shell',
+                f'am instrument --no-hidden-api-checks -w {ANDROID_SERVER_PACKAGE}/.Main',
+                shell=False,
+                timeout=None,
+                stderr=None))
+
+        self.instrumentation.start()
 
         self._device.adb.forward(
             [f'tcp:{self.port}', f'tcp:{ANDROID_SERVER_GRPC_PORT}'])
@@ -59,5 +63,7 @@ class AndroidService(BaseService):
             stderr=None)
 
         self._device.adb.forward(['--remove', f'tcp:{self.port}'])
+
+        self.instrumentation.join()
 
         self._is_alive = False
