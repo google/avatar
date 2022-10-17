@@ -26,6 +26,10 @@ class ExampleTest(base_test.BaseTestClass):
         self.dut = self.pandora_devices[0]
         self.ref = self.pandora_devices[1]
 
+    def setup_test(self):
+        self.dut.host.SoftReset()
+        self.ref.host.SoftReset()
+
     def test_print_addresses(self):
         dut_address = self.dut.address
         self.dut.log.info(f'Address: {dut_address}')

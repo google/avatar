@@ -18,6 +18,8 @@ from bumble.core import BT_BR_EDR_TRANSPORT
 from bumble.hci import Address, HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR
 from bumble.smp import PairingConfig
 
+from google.protobuf import empty_pb2
+
 from pandora.host_pb2 import ReadLocalAddressResponse, ConnectResponse, \
     Connection, DisconnectResponse, GetConnectionResponse
 from pandora.host_grpc import HostServicer
@@ -29,6 +31,10 @@ class HostService(HostServicer):
         self.device = device
         self.device.pairing_config_factory = lambda connection: PairingConfig(
             bonding=False)
+
+    async def SoftReset(self, request, context):
+        await self.device.power_on()
+        return empty_pb2.Empty()
 
     async def ReadLocalAddress(self, request, context):
         logging.info('ReadLocalAddress')
