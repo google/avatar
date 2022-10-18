@@ -81,6 +81,8 @@ class BumblePandoraServer:
     async def reset(self):
         # close device without closing the gRPC server
         await self.hci.close()
+        # FIXME: do you really need this ?
+        #  if yes may we need to `del` device too ?
         del self.hci
         # start will reset the bumble device object
         await self.start()
