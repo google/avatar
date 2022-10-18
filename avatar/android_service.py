@@ -19,7 +19,7 @@ from mobly.controllers.android_device_lib.services.base_service \
     import BaseService
 
 ANDROID_SERVER_PACKAGE = 'com.android.pandora'
-ANDROID_SERVER_GRPC_PORT = 8999
+ANDROID_SERVER_GRPC_PORT = 8999 # TODO: Use a dynamic port
 
 
 class AndroidService(BaseService):

@@ -21,8 +21,8 @@ import threading
 import mobly.controllers.android_device
 import mobly.signals
 
-from ..android_service import AndroidService
-from ..bumble_server import BumblePandoraServer
+from ..android_service import ANDROID_SERVER_GRPC_PORT, AndroidService
+from ..bumble_server import BUMBLE_SERVER_GRPC_PORT, BumblePandoraServer
 from ..utils import Address
 
 
@@ -82,8 +82,7 @@ class AndroidPandoraDevice(PandoraDevice):
 
     def __init__(self, android_device):
         self.android_device = android_device
-        # TODO: Use a dynamic port
-        port = 8999
+        port = ANDROID_SERVER_GRPC_PORT
         self.android_device.services.register('pandora', AndroidService, configs={
             'port': port
         })
@@ -128,5 +127,5 @@ class BumblePandoraDevice(PandoraDevice):
     def create(cls, transport, **kwargs):
         loop = asyncio.new_event_loop()
         server = loop.run_until_complete(
-            BumblePandoraServer.open(32144, transport, kwargs))
+            BumblePandoraServer.open(BUMBLE_SERVER_GRPC_PORT, transport, kwargs))
         return cls(loop, server)

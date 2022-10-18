@@ -30,7 +30,7 @@ from bumble.a2dp import make_audio_sink_service_sdp_records
 from pandora.host_grpc import add_HostServicer_to_server
 from .host import HostService
 
-BUMBLE_SERVER_PORT = 7999
+BUMBLE_SERVER_GRPC_PORT = 0
 ROOTCANAL_PORT_CUTTLEFISH = 7300
 
 current_dir = os.path.dirname(os.path.realpath(__file__))
@@ -88,7 +88,7 @@ class BumblePandoraServer:
 
 async def serve():
     transport = f'tcp-client:127.0.0.1:{ROOTCANAL_PORT_CUTTLEFISH}'
-    server = await BumblePandoraServer.open(BUMBLE_SERVER_PORT, transport,
+    server = await BumblePandoraServer.open(BUMBLE_SERVER_GRPC_PORT, transport,
                                             {'classic_enabled': True})
 
     await server.start()
