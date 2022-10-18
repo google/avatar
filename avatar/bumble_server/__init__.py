@@ -37,39 +37,59 @@ current_dir = os.path.dirname(os.path.realpath(__file__))
 
 
 class BumblePandoraServer:
-    def __init__(self, grpc_port, hci, config):
-        self.hci = hci
-        device_config = DeviceConfiguration()
-        device_config.load_from_dict(config)
-        host = Host(controller_source=hci.source, controller_sink=hci.sink)
-        self.device = Device(config=device_config, host=host)
-        self.device.classic_enabled = config.get('classic_enabled', False)
 
-        self.server = grpc.aio.server()
-        add_HostServicer_to_server(HostService(self.device), self.server)
-        self.grpc_port = self.server.add_insecure_port(
+    def __init__(self, grpc_port, transport_name, config):
+        self.transport_name = transport_name
+        self.config = config
+        self.grpc_server = grpc.aio.server()
+
+        self.host_service = HostService(self)
+        add_HostServicer_to_server(self.host_service, self.grpc_server)
+        self.grpc_port = self.grpc_server.add_insecure_port(
             f'localhost:{grpc_port}')
+
+    async def start(self):
+        self.hci = await open_transport(self.transport_name)
+
+        # initialize bumble device
+        device_config = DeviceConfiguration()
+        device_config.load_from_dict(self.config)
+        host = Host(controller_source=self.hci.source,
+                    controller_sink=self.hci.sink)
+        self.device = Device(config=device_config, host=host)
+        self.device.classic_enabled = self.config.get('classic_enabled', False)
+
+        # setup current device into host service
+        self.host_service.set_device(self.device)
+
+        # start bumble device
+        await self.device.power_on()
 
     @classmethod
     async def open(cls, grpc_port, transport_name, config):
-        hci = await open_transport(transport_name)
-        return cls(grpc_port=grpc_port, hci=hci, config=config)
-
-    async def start(self):
-        await self.device.power_on()
-        await self.server.start()
+        server = cls(grpc_port, transport_name, config)
+        await server.grpc_server.start()
+        return server
 
     async def wait_for_termination(self):
-        await self.server.wait_for_termination()
+        await self.grpc_server.wait_for_termination()
 
     async def close(self):
-        await self.server.stop(None)
+        await self.grpc_server.stop(None)
         await self.hci.close()
+
+    async def reset(self):
+        # close device without closing the gRPC server
+        await self.hci.close()
+        del self.hci
+        # start will reset the bumble device object
+        await self.start()
 
 
 async def serve():
     transport = f'tcp-client:127.0.0.1:{ROOTCANAL_PORT_CUTTLEFISH}'
-    server = await BumblePandoraServer.open(BUMBLE_SERVER_PORT, transport, {'classic_enabled': True})
+    server = await BumblePandoraServer.open(BUMBLE_SERVER_PORT, transport,
+                                            {'classic_enabled': True})
 
     await server.start()
     await server.wait_for_termination()

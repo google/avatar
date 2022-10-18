@@ -26,14 +26,20 @@ from pandora.host_grpc import HostServicer
 
 
 class HostService(HostServicer):
-
-    def __init__(self, device):
+    def __init__(self, server):
+        self.server = server
+        super().__init__()
+        
+    def set_device(self, device):
         self.device = device
-        self.device.pairing_config_factory = lambda connection: PairingConfig(
-            bonding=False)
+        self.device.pairing_config_factory = lambda connection: PairingConfig(bonding=False)
 
     async def SoftReset(self, request, context):
         await self.device.power_on()
+        return empty_pb2.Empty()
+
+    async def HardReset(self, request, context):
+        await self.server.reset()
         return empty_pb2.Empty()
 
     async def ReadLocalAddress(self, request, context):

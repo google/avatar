@@ -106,9 +106,9 @@ class AndroidPandoraDevice(PandoraDevice):
 
 class BumblePandoraDevice(PandoraDevice):
 
-    def __init__(self, server):
+    def __init__(self, loop, server):
         self.server = server
-        self.loop = asyncio.get_event_loop()
+        self.loop = loop
         self.loop.run_until_complete(self.server.start())
         self.thread = threading.Thread(target=lambda: self.loop.run_forever())
         self.thread.start()
@@ -126,7 +126,7 @@ class BumblePandoraDevice(PandoraDevice):
 
     @classmethod
     def create(cls, transport, **kwargs):
-        loop = asyncio.get_event_loop()
+        loop = asyncio.new_event_loop()
         server = loop.run_until_complete(
-            BumblePandoraServer.open(0, transport, kwargs))
-        return cls(server)
+            BumblePandoraServer.open(32144, transport, kwargs))
+        return cls(loop, server)
