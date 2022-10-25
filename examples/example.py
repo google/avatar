@@ -14,11 +14,14 @@
 
 import logging
 
-from mobly import test_runner, base_test, asserts
-from grpc import RpcError
+from mobly import test_runner, base_test
 
 from avatar.utils import Address, into_synchronous
 from avatar.controllers import pandora_device
+from pandora.host_pb2 import (
+    DataTypes,
+    AddressType
+)
 
 
 class ExampleTest(base_test.BaseTestClass):
@@ -43,13 +46,29 @@ class ExampleTest(base_test.BaseTestClass):
     async def test_classic_connect(self):
         dut_address = self.dut.address
         self.dut.log.info(f'Address: {dut_address}')
-        try:
-            connection = (await self.ref.host.Connect(address=dut_address)).connection
-            await self.ref.host.Disconnect(connection=connection)
-        except RpcError as error:
-            self.dut.log.error(error)
-            asserts.assert_true(False, 'gRPC Error')
+        connection = (await self.ref.host.Connect(address=dut_address)).connection
+        await self.ref.host.Disconnect(connection=connection)
 
+    @into_synchronous()
+    async def test_le_connect(self):
+        await self.dut.host.StartAdvertising(
+            own_address_type=AddressType.PUBLIC,
+            data=DataTypes(include_complete_local_name=True),
+            scan_response_data=DataTypes(include_complete_local_name=True),
+            is_connectable=True
+        )
+
+        res = None
+        async for res in self.ref.host.StartScanning():
+            if Address(res.address) == self.dut.address:
+                logging.info(f"Scan result: '{res.data.complete_local_name}' {Address(res.address)}")
+                await self.ref.host.StopScanning()
+                break
+
+        # we scanned the DUT device, try connect
+        assert Address(res.address) == self.dut.address
+        connection = (await self.ref.host.ConnectLE(address=res.address)).connection
+        await self.ref.host.Disconnect(connection=connection)
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
