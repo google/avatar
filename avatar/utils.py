@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
+
 
 class Address(bytes):
 
@@ -30,3 +32,16 @@ class Address(bytes):
 
     def __str__(self):
         return ':'.join([f'{x:02X}' for x in self])
+
+
+# Convert an asynchronous function to a synchronous one by
+# executing it's code within a loop
+def into_synchronous(within_loop=None, submit=False):
+    def decorator(f):
+        def wrapper(*args):
+            loop = within_loop if within_loop else asyncio.get_event_loop()
+            if not submit:
+                return loop.run_until_complete(f(*args))
+            return asyncio.run_coroutine_threadsafe(f(*args), loop).result()
+        return wrapper
+    return decorator

@@ -17,6 +17,7 @@ import logging
 from mobly import test_runner, base_test, asserts
 from grpc import RpcError
 
+from avatar.utils import Address, into_synchronous
 from avatar.controllers import pandora_device
 
 
@@ -26,21 +27,25 @@ class ExampleTest(base_test.BaseTestClass):
         self.dut = self.pandora_devices[0]
         self.ref = self.pandora_devices[1]
 
-    def setup_test(self):
-        self.dut.host.SoftReset()
-        self.ref.host.SoftReset()
+    @into_synchronous()
+    async def setup_test(self):
+        await self.dut.host.SoftReset()
+        await self.ref.host.SoftReset()
 
-    def test_print_addresses(self):
+    @into_synchronous()
+    async def test_print_addresses(self):
         dut_address = self.dut.address
         self.dut.log.info(f'Address: {dut_address}')
         ref_address = self.ref.address
         self.ref.log.info(f'Address: {ref_address}')
 
-    def test_classic_connect(self):
+    @into_synchronous()
+    async def test_classic_connect(self):
         dut_address = self.dut.address
         self.dut.log.info(f'Address: {dut_address}')
         try:
-            self.ref.host.Connect(address=dut_address)
+            connection = (await self.ref.host.Connect(address=dut_address)).connection
+            await self.ref.host.Disconnect(connection=connection)
         except RpcError as error:
             self.dut.log.error(error)
             asserts.assert_true(False, 'gRPC Error')

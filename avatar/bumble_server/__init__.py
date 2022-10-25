@@ -30,7 +30,7 @@ from bumble.a2dp import make_audio_sink_service_sdp_records
 from pandora.host_grpc import add_HostServicer_to_server
 from .host import HostService
 
-BUMBLE_SERVER_GRPC_PORT = 0
+BUMBLE_SERVER_GRPC_PORT = 7999
 ROOTCANAL_PORT_CUTTLEFISH = 7300
 
 current_dir = os.path.dirname(os.path.realpath(__file__))

@@ -16,14 +16,13 @@ import logging
 import grpc
 import importlib
 import asyncio
-import threading
 
 import mobly.controllers.android_device
 import mobly.signals
 
 from ..android_service import ANDROID_SERVER_GRPC_PORT, AndroidService
-from ..bumble_server import BUMBLE_SERVER_GRPC_PORT, BumblePandoraServer
-from ..utils import Address
+from ..bumble_server import BumblePandoraServer
+from ..utils import Address, into_synchronous
 
 
 from pandora.host_grpc import Host
@@ -31,33 +30,36 @@ from pandora.host_grpc import Host
 MOBLY_CONTROLLER_CONFIG_NAME = 'PandoraDevice'
 
 
-def create(configs):
-    def create_device(config):
+@into_synchronous()
+async def create(configs):
+    async def create_device(config):
         module_name = config.pop('module', PandoraDevice.__module__)
         class_name = config.pop('class', PandoraDevice.__name__)
 
         module = importlib.import_module(module_name)
-        return getattr(module, class_name).create(**config)
+        device: PandoraDevice = await getattr(module, class_name).create(**config)
 
-    return list(map(create_device, configs))
+        # Always cache the device address after creation,
+        # this way it's direclty avaible for `PandoraDeviceLoggerAdapter`
+        await device.cache_address()
+        return device
 
+    return await asyncio.gather(*[create_device(config) for config in configs])
 
-def destroy(devices):
-    for device in devices:
-        device.close()
+@into_synchronous()
+async def destroy(devices):
+    await asyncio.gather(*[device.close() for device in devices])
 
 
 class PandoraDevice:
 
     def __init__(self, target):
-        self.channel = grpc.insecure_channel(target)
-        self.log = PandoraDeviceLoggerAdapter(logging.getLogger(), {
-            'class': self.__class__.__name__,
-            'address': self.address
-        })
+        self._address = None
+        self.channel = grpc.aio.insecure_channel(target)
+        self.log = PandoraDeviceLoggerAdapter(logging.getLogger(), self)
 
     @classmethod
-    def create(cls, **kwargs):
+    async def create(cls, **kwargs):
         return cls(**kwargs)
 
     @property
@@ -66,15 +68,26 @@ class PandoraDevice:
 
     @property
     def address(self):
-        return Address(self.host.ReadLocalAddress().address)
+        '''
+        Cached bluetooth device address.
+        See `Device.cache_address`.
+        '''
+        assert self._address  # make sure the `address` is already cached
+        return self._address
 
-    def close(self):
-        self.channel.close()
+    async def cache_address(self):
+        '''
+        Read the local address and cache it inside the device object under the `Device.address` property.
+        '''
+        self._address = Address((await self.host.ReadLocalAddress()).address)
+
+    async def close(self):
+        await self.channel.close()
 
 
 class PandoraDeviceLoggerAdapter(logging.LoggerAdapter):
     def process(self, msg, kwargs):
-        msg = f'[{self.extra["class"]}|{self.extra["address"]}] {msg}'
+        msg = f'[{self.extra.__class__.__name__}|{self.extra.address}] {msg}'
         return (msg, kwargs)
 
 
@@ -88,12 +101,12 @@ class AndroidPandoraDevice(PandoraDevice):
         })
         super().__init__(f'localhost:{port}')
 
-    def close(self):
+    async def close(self):
         super().close()
         mobly.controllers.android_device.destroy([self.android_device])
 
     @classmethod
-    def create(cls, config):
+    async def create(cls, config):
         android_devices = mobly.controllers.android_device.create(config)
         if not android_devices:
             raise mobly.signals.ControllerError(
@@ -104,28 +117,21 @@ class AndroidPandoraDevice(PandoraDevice):
 
 
 class BumblePandoraDevice(PandoraDevice):
-
-    def __init__(self, loop, server):
+    def __init__(self, server):
         self.server = server
-        self.loop = loop
-        self.loop.run_until_complete(self.server.start())
-        self.thread = threading.Thread(target=lambda: self.loop.run_forever())
-        self.thread.start()
-
+        self.task = asyncio.create_task(self.server.wait_for_termination())
         super().__init__(f'localhost:{self.server.grpc_port}')
 
-    def close(self):
-        super().close()
-        self.loop.call_soon_threadsafe(lambda: self.loop.stop())
-        self.thread.join()
+    async def close(self):
+        await super().close()
+        self.task.cancel()
 
     @property
     def device(self):
         return self.server.device
 
     @classmethod
-    def create(cls, transport, **kwargs):
-        loop = asyncio.new_event_loop()
-        server = loop.run_until_complete(
-            BumblePandoraServer.open(BUMBLE_SERVER_GRPC_PORT, transport, kwargs))
-        return cls(loop, server)
+    async def create(cls, transport, **kwargs):
+        server = await BumblePandoraServer.open(0, transport, kwargs)
+        await server.start()
+        return cls(server)
