@@ -25,5 +25,17 @@ pip install grpcio-tools==1.46.3
 ## Usage
 
 ```bash
-python examples/example.py -c examples/example_config.yml --verbose
+python examples/example.py -c examples/simulated_bumble_android.yml --verbose
+```
+
+## Development
+
+1. Make sure to have a `root-canal` instance running somewhere.
+```bash
+root-canal
+```
+
+1. Run the example using Bumble vs Bumble config file. The default `6402` HCI port of `root-canal` may be changed in this config file.
+```
+python examples/example.py -c examples/simulated_bumble_bumble.yml --verbose
 ```

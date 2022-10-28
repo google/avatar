@@ -27,8 +27,8 @@ from pandora.host_pb2 import (
 class ExampleTest(base_test.BaseTestClass):
     def setup_class(self):
         self.pandora_devices = self.register_controller(pandora_device)
-        self.dut = self.pandora_devices[0]
-        self.ref = self.pandora_devices[1]
+        self.dut: pandora_device.PandoraDevice = self.pandora_devices[0]
+        self.ref: pandora_device.PandoraDevice = self.pandora_devices[1]
 
     @into_synchronous()
     async def setup_test(self):

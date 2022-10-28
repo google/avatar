@@ -1,0 +1,12 @@
+---
+
+TestBeds:
+- Name: ExampleTest
+  Controllers:
+    PandoraDevice:
+    - class: BumblePandoraDevice
+      transport: 'tcp-client:127.0.0.1:6402'
+      classic_enabled: true
+    - class: BumblePandoraDevice
+      transport: 'tcp-client:127.0.0.1:6402'
+      classic_enabled: true
