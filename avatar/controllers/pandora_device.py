@@ -102,7 +102,7 @@ class AndroidPandoraDevice(PandoraDevice):
         super().__init__(f'localhost:{port}')
 
     async def close(self):
-        super().close()
+        await super().close()
         mobly.controllers.android_device.destroy([self.android_device])
 
     @classmethod
