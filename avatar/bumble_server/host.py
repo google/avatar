@@ -26,14 +26,15 @@ from google.protobuf.message import Message
 
 from pandora.host_grpc import HostServicer
 from pandora.host_pb2 import (
-    Connection,
-    DataTypes
+    DiscoverabilityMode, ConnectabilityMode,
+    Connection, DataTypes
 )
 from pandora.host_pb2 import (
     ReadLocalAddressResponse,
     ConnectResponse, GetConnectionResponse, WaitConnectionResponse,
     ConnectLEResponse, GetLEConnectionResponse,
-    StartAdvertisingResponse, StartScanningResponse
+    StartAdvertisingResponse, StartScanningResponse, StartInquiryResponse,
+    GetRemoteNameResponse
 )
 
 
@@ -41,12 +42,19 @@ class HostService(HostServicer):
 
     def __init__(self, server):
         self.server = server
-        self.scan_queue = asyncio.Queue()
         super().__init__()
 
-    def set_device(self, device: Device):
+    async def set_device(self, device: Device):
         self.device = device
         self.device.pairing_config_factory = lambda connection: PairingConfig(bonding=False)
+        self.scan_queue = asyncio.Queue()
+        self.inquiry_queue = asyncio.Queue()
+        self.discoverability_mode = DiscoverabilityMode.NOT_DISCOVERABLE
+        self.connectability_mode = ConnectabilityMode.CONNECTABLE
+
+        # According to `host.proto`:
+        # At startup, the Host must be in BR/EDR connectable mode
+        await self.device.set_scan_enable(False, True)
 
     async def HardReset(self, request, context):
         logging.info('HardReset')
@@ -134,8 +142,7 @@ class HostService(HostServicer):
         return GetLEConnectionResponse(connection=Connection(cookie=connection_handle, transport=BT_LE_TRANSPORT))
 
     async def Disconnect(self, request, context):
-        # Need to reverse bytes order since Bumble Address is using MSB.
-        connection_handle = int.from_bytes(request.connection.cookie,'big')
+        connection_handle = int.from_bytes(request.connection.cookie, 'big')
         logging.info(f"Disconnect: {connection_handle}")
 
         logging.info("Disconnecting...")
@@ -225,6 +232,7 @@ class HostService(HostServicer):
 
         finally:
             self.device.remove_listener('advertisement', handler)
+            self.scan_queue = asyncio.Queue()
             await self.device.stop_scanning()
 
     async def StopScanning(self, request, context):
@@ -233,11 +241,70 @@ class HostService(HostServicer):
         await self.scan_queue.put(None)
         return empty_pb2.Empty()
 
-    # TODO: implement StartInquiry
-    # TODO: implement StopInquiry
-    # TODO: implement SetDiscoverabilityMode
-    # TODO: implement SetConnectabilityMode
-    # TODO: implement GetRemoteName
+    async def StartInquiry(self, request, context):
+        logging.info('StartInquiry')
+
+        handler = self.device.on(
+            'inquiry_result',
+            lambda address, class_of_device, eir_data, rssi:
+                self.inquiry_queue.put_nowait((address, class_of_device, eir_data, rssi))
+        )
+        await self.device.start_discovery(auto_restart=False)
+        try:
+            while inquiry_result := await self.inquiry_queue.get():
+                (address, class_of_device, eir_data, rssi) = inquiry_result
+                # FIXME: if needed, add support for `page_scan_rep_mode` and `clock_offset` in Bumble
+                yield StartInquiryResponse(
+                    address=bytes(reversed(bytes(address))),
+                    class_of_device=class_of_device,
+                    rssi=rssi,
+                    data=self.pack_data_types(eir_data)
+                )
+
+        finally:
+            self.device.remove_listener('inquiry_result', handler)
+            self.inquiry_queue = asyncio.Queue()
+            await self.device.stop_discovery()
+
+    async def StopInquiry(self, request, context):
+        logging.info("StopInquiry")
+        await self.device.stop_discovery()
+        await self.inquiry_queue.put(None)
+        return empty_pb2.Empty()
+
+    async def SetDiscoverabilityMode(self, request, context):
+        logging.info("SetDiscoverabilityMode")
+        self.discoverability_mode = request.mode
+        await self.device.set_scan_enable(
+            self.discoverability_mode != DiscoverabilityMode.NOT_DISCOVERABLE,
+            self.connectability_mode != ConnectabilityMode.NOT_CONNECTABLE
+        )
+        return empty_pb2.Empty()
+
+    async def SetConnectabilityMode(self, request, context):
+        logging.info("SetConnectabilityMode")
+        self.connectability_mode = request.mode
+        await self.device.set_scan_enable(
+            self.discoverability_mode != DiscoverabilityMode.NOT_DISCOVERABLE,
+            self.connectability_mode != ConnectabilityMode.NOT_CONNECTABLE
+        )
+        return empty_pb2.Empty()
+
+    async def GetRemoteName(self, request: Message, context):
+        if request.WhichOneof('remote') == 'connection':
+            connection_handle = int.from_bytes(request.connection.cookie, 'big')
+            logging.info("GetRemoteName {connection_handle}")
+
+            remote = self.device.lookup_connection(connection_handle)
+            assert request.connection.transport == remote.transport
+        else:
+            # Need to reverse bytes order since Bumble Address is using MSB.
+            remote = Address(bytes(reversed(request.address)), address_type=Address.PUBLIC_DEVICE_ADDRESS)
+            logging.info(f"GetRemoteName: {remote}")
+
+        remote_name = await self.device.request_remote_name(remote)
+        return GetRemoteNameResponse(name=remote_name)
+
 
     def unpack_data_types(self, datas: Message) -> AdvertisingData:
         res = AdvertisingData()

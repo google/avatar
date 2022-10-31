@@ -12,15 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import logging
 
-from mobly import test_runner, base_test
+from mobly import test_runner, base_test, signals
 
 from avatar.utils import Address, into_synchronous
 from avatar.controllers import pandora_device
 from pandora.host_pb2 import (
-    DataTypes,
-    AddressType
+    DataTypes, AddressType,
+    DiscoverabilityMode
 )
 
 
@@ -43,10 +44,19 @@ class ExampleTest(base_test.BaseTestClass):
         self.ref.log.info(f'Address: {ref_address}')
 
     @into_synchronous()
+    async def test_get_remote_name(self):
+        dut_name = (await self.ref.host.GetRemoteName(address=self.dut.address)).name
+        self.ref.log.info(f'DUT remote name: {dut_name}')
+        ref_name = (await self.dut.host.GetRemoteName(address=self.ref.address)).name
+        self.dut.log.info(f'REF remote name: {ref_name}')
+
+    @into_synchronous()
     async def test_classic_connect(self):
         dut_address = self.dut.address
         self.dut.log.info(f'Address: {dut_address}')
         connection = (await self.ref.host.Connect(address=dut_address)).connection
+        dut_name = (await self.ref.host.GetRemoteName(connection=connection)).name
+        self.ref.log.info(f'Connected with: "{dut_name}" {dut_address}')
         await self.ref.host.Disconnect(connection=connection)
 
     @into_synchronous()
@@ -69,6 +79,46 @@ class ExampleTest(base_test.BaseTestClass):
         assert Address(res.address) == self.dut.address
         connection = (await self.ref.host.ConnectLE(address=res.address)).connection
         await self.ref.host.Disconnect(connection=connection)
+
+    @into_synchronous()
+    async def test_not_discoverable(self):
+        await self.dut.host.SetDiscoverabilityMode(mode=DiscoverabilityMode.NOT_DISCOVERABLE)
+
+        async def stop_after(delay):
+            await asyncio.sleep(delay)
+            await self.ref.host.StopInquiry()
+
+        asyncio.create_task(stop_after(3.0))
+
+        # We mut not see our DUT device
+        async for res in self.ref.host.StartInquiry():
+            assert Address(res.address) != self.dut.address
+
+    @into_synchronous()
+    async def test_discoverable(self):
+        await self.dut.host.SetDiscoverabilityMode(mode=DiscoverabilityMode.DISCOVERABLE_LIMITED)
+
+        async def fail_after(delay):
+            await asyncio.sleep(delay)
+            raise signals.TestFailure
+
+        fail = asyncio.create_task(fail_after(3.0))
+
+        # We mut not see our DUT device
+        async for res in self.ref.host.StartInquiry():
+            if Address(res.address) == self.dut.address:
+                fail.cancel()
+                await self.ref.host.StopInquiry()
+
+        await self.dut.host.SetDiscoverabilityMode(mode=DiscoverabilityMode.DISCOVERABLE_GENERAL)
+
+        fail = asyncio.create_task(fail_after(3.0))
+
+        # We mut not see our DUT device
+        async for res in self.ref.host.StartInquiry():
+            if Address(res.address) == self.dut.address:
+                fail.cancel()
+                await self.ref.host.StopInquiry()
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)

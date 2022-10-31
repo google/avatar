@@ -3,4 +3,4 @@
 	url = sso://pandora/bt-test-interfaces
 [submodule "bumble"]
 	path = third-party/bumble
-	url = sso://pandora/third_party/bumble
+	url = sso://github/google/bumble

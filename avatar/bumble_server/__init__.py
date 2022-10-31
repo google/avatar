@@ -59,11 +59,11 @@ class BumblePandoraServer:
         self.device = Device(config=device_config, host=host)
         self.device.classic_enabled = self.config.get('classic_enabled', False)
 
-        # setup current device into host service
-        self.host_service.set_device(self.device)
-
         # start bumble device
         await self.device.power_on()
+
+        # setup current device into host service
+        await self.host_service.set_device(self.device)
 
     @classmethod
     async def open(cls, grpc_port, transport_name, config):
