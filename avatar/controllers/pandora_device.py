@@ -16,13 +16,15 @@ import logging
 import grpc
 import importlib
 import asyncio
+import avatar
+import contextlib
 
 import mobly.controllers.android_device
 import mobly.signals
 
 from ..android_service import ANDROID_SERVER_GRPC_PORT, AndroidService
 from ..bumble_server import BumblePandoraServer
-from ..utils import Address, into_synchronous
+from ..utils import Address
 
 
 from pandora.host_grpc import Host
@@ -30,59 +32,51 @@ from pandora.host_grpc import Host
 MOBLY_CONTROLLER_CONFIG_NAME = 'PandoraDevice'
 
 
-@into_synchronous()
-async def create(configs):
-    async def create_device(config):
-        module_name = config.pop('module', PandoraDevice.__module__)
-        class_name = config.pop('class', PandoraDevice.__name__)
+def create_device(config):
+    module_name = config.pop('module', PandoraDevice.__module__)
+    class_name = config.pop('class', PandoraDevice.__name__)
 
-        module = importlib.import_module(module_name)
-        device: PandoraDevice = await getattr(module, class_name).create(**config)
+    module = importlib.import_module(module_name)
+    return getattr(module, class_name).create(**config)
 
-        # Always cache the device address after creation,
-        # this way it's direclty avaible for `PandoraDeviceLoggerAdapter`
-        await device.cache_address()
-        return device
+# Run `create` asynchronously in our loop so Bumble(s) IO and gRPC servers
+# are created into it.
+# Also permit to `create` devices in parallel.
+def create(configs):
+    async def coro(): return await asyncio.gather(*[create_device(config) for config in configs])
+    return asyncio.run_coroutine_threadsafe(coro(), avatar.loop).result()
 
-    return await asyncio.gather(*[create_device(config) for config in configs])
-
-@into_synchronous()
-async def destroy(devices):
-    await asyncio.gather(*[device.close() for device in devices])
+# Destroy devices in parallel.
+def destroy(devices):
+    async def coro(): return await asyncio.gather(*[device.close() for device in devices])
+    return asyncio.run_coroutine_threadsafe(coro(), avatar.loop).result()
 
 
 class PandoraDevice:
 
     def __init__(self, target):
-        self._address = None
-        self.channel = grpc.aio.insecure_channel(target)
+        self.address = Address(b'\x00\x00\x00\x00\x00\x00')
+        self.channels = (grpc.insecure_channel(target), grpc.aio.insecure_channel(target))
         self.log = PandoraDeviceLoggerAdapter(logging.getLogger(), self)
 
     @classmethod
     async def create(cls, **kwargs):
         return cls(**kwargs)
 
-    @property
-    def host(self):
-        return Host(self.channel)
-
-    @property
-    def address(self):
-        '''
-        Cached bluetooth device address.
-        See `Device.cache_address`.
-        '''
-        assert self._address  # make sure the `address` is already cached
-        return self._address
-
-    async def cache_address(self):
-        '''
-        Read the local address and cache it inside the device object under the `Device.address` property.
-        '''
-        self._address = Address((await self.host.ReadLocalAddress()).address)
-
     async def close(self):
-        await self.channel.close()
+        self.channels[0].close()
+        await self.channels[1].close()
+
+    @property
+    def channel(self) -> grpc.Channel | grpc.aio.Channel:
+        # Force the use of the asynchronous channel when running in our event loop.
+        with contextlib.suppress(RuntimeError):
+            if avatar.loop == asyncio.get_running_loop(): return self.channels[1]
+        return self.channels[0]
+
+    @property
+    def host(self) -> Host:
+        return Host(self.channel)
 
 
 class PandoraDeviceLoggerAdapter(logging.LoggerAdapter):
@@ -118,13 +112,12 @@ class AndroidPandoraDevice(PandoraDevice):
 
 class BumblePandoraDevice(PandoraDevice):
     def __init__(self, server):
-        self.server = server
-        self.task = asyncio.create_task(self.server.wait_for_termination())
+        self.server: BumblePandoraServer = server
         super().__init__(f'localhost:{self.server.grpc_port}')
 
     async def close(self):
+        await self.server.close()
         await super().close()
-        self.task.cancel()
 
     @property
     def device(self):

@@ -18,3 +18,26 @@ any Bluetooth test cases virtually and physically.
 """
 
 __version__ = "0.0.1"
+
+
+import asyncio
+
+from threading import Thread
+from mobly import base_test
+
+
+# Keep running an event loop is a separate thread,
+# which is then used to:
+#   * Schedule Bumble(s) IO & gRPC server.
+#   * Schedule asynchronous tests.
+loop = asyncio.new_event_loop()
+thread = Thread(target=loop.run_forever, daemon=True)
+thread.start()
+
+
+# Convert an asynchronous test function to a synchronous one by
+# executing it's code within our loop
+def asynchronous(test):
+    def wrapper(self: base_test.BaseTestClass):
+        return asyncio.run_coroutine_threadsafe(test(self), loop).result()
+    return wrapper

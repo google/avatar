@@ -108,7 +108,10 @@ class HostService(HostServicer):
 
     async def WaitConnection(self, request, context):
         # Need to reverse bytes order since Bumble Address is using MSB.
-        address = Address(bytes(reversed(request.address)), address_type=Address.PUBLIC_DEVICE_ADDRESS)
+        if request.address:
+            address = Address(bytes(reversed(request.address)), address_type=Address.PUBLIC_DEVICE_ADDRESS)
+        else:
+            address = Address.ANY
         logging.info(f"WaitConnection: {address}")
 
         logging.info("Wait connection...")
@@ -244,11 +247,13 @@ class HostService(HostServicer):
     async def StartInquiry(self, request, context):
         logging.info('StartInquiry')
 
-        handler = self.device.on(
+        complete_handler = self.device.on('inquiry_complete', lambda: self.inquiry_queue.put_nowait(None))
+        result_handler = self.device.on(
             'inquiry_result',
             lambda address, class_of_device, eir_data, rssi:
                 self.inquiry_queue.put_nowait((address, class_of_device, eir_data, rssi))
         )
+
         await self.device.start_discovery(auto_restart=False)
         try:
             while inquiry_result := await self.inquiry_queue.get():
@@ -262,7 +267,8 @@ class HostService(HostServicer):
                 )
 
         finally:
-            self.device.remove_listener('inquiry_result', handler)
+            self.device.remove_listener('inquiry_complete', complete_handler)
+            self.device.remove_listener('inquiry_result', result_handler)
             self.inquiry_queue = asyncio.Queue()
             await self.device.stop_discovery()
 
@@ -363,17 +369,17 @@ class HostService(HostServicer):
         elif data := datas.tx_power_level:
             res.ad_structures.append((
                 AdvertisingData.TX_POWER_LEVEL,
-                struct.pack('<c', data)
+                bytes(struct.pack('<I', data)[:1])
             ))
         if datas.HasField('include_class_of_device'):
             res.ad_structures.append((
                 AdvertisingData.CLASS_OF_DEVICE,
-                bytes(struct.pack('<I', self.device.class_of_device)[1:])
+                bytes(struct.pack('<I', self.device.class_of_device)[:-1])
             ))
         elif data := datas.class_of_device:
             res.ad_structures.append((
                 AdvertisingData.CLASS_OF_DEVICE,
-                bytes(struct.pack('<I', data)[1:])
+                bytes(struct.pack('<I', data)[:-1])
             ))
         if data := datas.peripheral_connection_interval_min:
             res.ad_structures.append((

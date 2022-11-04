@@ -2,6 +2,9 @@
 
 TestBeds:
 - Name: ExampleTest
+  TestParams:
+    hard_reset_on_setup_test: False
+    soft_reset_on_setup_test: False
   Controllers:
     PandoraDevice:
     - class: BumblePandoraDevice
