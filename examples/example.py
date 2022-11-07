@@ -32,15 +32,15 @@ class ExampleTest(base_test.BaseTestClass):
 
     @avatar.asynchronous
     async def setup_test(self):
-        if self.user_params.get('hard_reset_on_setup_test', False):
+        if self.user_params.get('factory_reset_on_setup_test', False):
             await asyncio.gather(
-                self.dut.host.HardReset(),
-                self.ref.host.HardReset()
+                self.dut.host.FactoryReset(),
+                self.ref.host.FactoryReset()
             )
-        elif self.user_params.get('soft_reset_on_setup_test', False):
+        elif self.user_params.get('reset_on_setup_test', False):
             await asyncio.gather(
-                self.dut.host.SoftReset(),
-                self.ref.host.SoftReset()
+                self.dut.host.Reset(),
+                self.ref.host.Reset()
             )
 
         dut_res, ref_res = await asyncio.gather(
@@ -71,10 +71,10 @@ class ExampleTest(base_test.BaseTestClass):
         self.ref.host.Disconnect(connection=connection)
 
     def test_le_connect(self):
-        self.dut.host.StartAdvertising(is_connectable=True)
+        self.dut.host.StartAdvertising(legacy=True, connectable=True)
         peers = self.ref.host.StartScanning()
-        dut = next((x for x in peers if x.address == self.dut.address))
-        connection = self.ref.host.ConnectLE(address=dut.address).connection
+        dut = next((x for x in peers if x.public == self.dut.address))
+        connection = self.ref.host.ConnectLE(public=dut.public).connection
         self.ref.host.Disconnect(connection=connection)
 
     def test_not_discoverable(self):
@@ -111,11 +111,12 @@ class ExampleTest(base_test.BaseTestClass):
 
     def test_scan_response_data(self):
         self.dut.host.StartAdvertising(
+            legacy=True,
             data=DataTypes(include_shortened_local_name=True, tx_power_level=42),
             scan_response_data=DataTypes(include_complete_local_name=True, include_class_of_device=True)
         )
 
-        scan_response = next((x for x in self.ref.host.StartScanning() if x.address == self.dut.address))
+        scan_response = next((x for x in self.ref.host.StartScanning() if x.public == self.dut.address))
         assert type(scan_response.data.complete_local_name) == str
         assert type(scan_response.data.shortened_local_name) == str
         assert type(scan_response.data.class_of_device) == int
