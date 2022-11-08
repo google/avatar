@@ -3,8 +3,7 @@
 TestBeds:
 - Name: ExampleTest
   TestParams:
-    factory_reset_on_setup_test: False
-    reset_on_setup_test: False
+    factory_reset: False
   Controllers:
     PandoraDevice:
     - class: BumblePandoraDevice

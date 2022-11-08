@@ -68,7 +68,7 @@ class PandoraDevice:
         await self.channels[1].close()
 
     @property
-    def channel(self) -> grpc.Channel | grpc.aio.Channel:
+    def channel(self):
         # Force the use of the asynchronous channel when running in our event loop.
         with contextlib.suppress(RuntimeError):
             if avatar.loop == asyncio.get_running_loop(): return self.channels[1]

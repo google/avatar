@@ -20,6 +20,7 @@ import asyncio
 import logging
 import os
 import grpc
+import random
 
 from bumble.host import Host
 from bumble.device import Device, DeviceConfiguration
@@ -32,8 +33,6 @@ from .host import HostService
 
 BUMBLE_SERVER_GRPC_PORT = 7999
 ROOTCANAL_PORT_CUTTLEFISH = 7300
-
-current_dir = os.path.dirname(os.path.realpath(__file__))
 
 
 class BumblePandoraServer:
@@ -51,12 +50,17 @@ class BumblePandoraServer:
     async def start(self):
         self.hci = await open_transport(self.transport_name)
 
+        # generate a random address
+        random_address = f"{random.randint(192,255):02X}"  # address is static random
+        for c in random.sample(range(255), 5):
+            random_address += f":{c:02X}"
+
         # initialize bumble device
         device_config = DeviceConfiguration()
         device_config.load_from_dict(self.config)
         host = Host(controller_source=self.hci.source,
                     controller_sink=self.hci.sink)
-        self.device = Device(config=device_config, host=host)
+        self.device = Device(config=device_config, host=host, address=random_address)
         self.device.classic_enabled = self.config.get('classic_enabled', False)
 
         # start bumble device

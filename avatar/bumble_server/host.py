@@ -33,7 +33,6 @@ from bumble.hci import (
 
 from google.protobuf import empty_pb2
 from google.protobuf import any_pb2
-from google.protobuf.message import Message
 
 from pandora.host_grpc import HostServicer
 from pandora.host_pb2 import (
@@ -171,7 +170,8 @@ class HostService(HostServicer):
 
         try:
             logging.info("Connecting...")
-            connection = await self.device.connect(address, transport=BT_LE_TRANSPORT)
+            connection = await self.device.connect(address,
+                transport=BT_LE_TRANSPORT, own_address_type=request.own_address_type)
             logging.info("Connected")
         except ConnectionError as e:
             if e.error_code == HCI_PAGE_TIMEOUT_ERROR:
@@ -239,7 +239,7 @@ class HostService(HostServicer):
             return GetLEConnectionResponse(connection=Connection(cookie=cookie))
         finally:
             self.device.remove_listener('connection', handler)
-            self.device.remove_listener('connecconnection_failuretion', failure_handler)
+            self.device.remove_listener('connection_failure', failure_handler)
 
     async def Disconnect(self, request, context):
         connection_handle = int.from_bytes(request.connection.cookie.value, 'big')
@@ -252,8 +252,8 @@ class HostService(HostServicer):
 
         return empty_pb2.Empty()
 
-    # TODO: use adversing set commands
-    async def StartAdvertising(self, request: Message, context):
+    # TODO: use advertising set commands
+    async def StartAdvertising(self, request, context):
         # TODO: add support for extended advertising in Bumble
         # TODO: add support for `request.interval`
         # TODO: add support for `request.interval_range`
@@ -300,7 +300,7 @@ class HostService(HostServicer):
         # FIXME: wait for advertising sets to have a correct set, use `None` for now
         return StartAdvertisingResponse(set=None)
 
-    # TODO: use adversing set commands
+    # TODO: use advertising set commands
     async def StopAdvertising(self, request, context):
         logging.info('StopAdvertising')
         await self.device.stop_advertising()
@@ -400,7 +400,7 @@ class HostService(HostServicer):
         )
         return empty_pb2.Empty()
 
-    async def GetRemoteName(self, request: Message, context):
+    async def GetRemoteName(self, request, context):
         if request.WhichOneof('remote') == 'connection':
             connection_handle = int.from_bytes(request.connection.cookie.value, 'big')
             logging.info(f"GetRemoteName: {connection_handle}")
@@ -421,7 +421,7 @@ class HostService(HostServicer):
             raise e
 
 
-    def unpack_data_types(self, datas: Message) -> AdvertisingData:
+    def unpack_data_types(self, datas) -> AdvertisingData:
         res = AdvertisingData()
         if data := datas.incomplete_service_class_uuids16:
             res.ad_structures.append((

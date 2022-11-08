@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from bumble.hci import Address as BumbleAddress
+
 
 class Address(bytes):
 
@@ -20,6 +22,8 @@ class Address(bytes):
             address_bytes = address
         elif type(address) is str:
             address_bytes = bytes.fromhex(address.replace(':', ''))
+        elif isinstance(address, BumbleAddress):
+            address_bytes = bytes(reversed(bytes(address)))
         else:
             raise ValueError('Invalid address format')
 

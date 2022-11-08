@@ -21,23 +21,25 @@ from mobly import test_runner, base_test
 
 from avatar.utils import Address
 from avatar.controllers import pandora_device
-from pandora.host_pb2 import DiscoverabilityMode, DataTypes
+from pandora.host_pb2 import (
+    DiscoverabilityMode, DataTypes, OwnAddressType
+)
 
 
 class ExampleTest(base_test.BaseTestClass):
     def setup_class(self):
         self.pandora_devices = self.register_controller(pandora_device)
         self.dut: pandora_device.PandoraDevice = self.pandora_devices[0]
-        self.ref: pandora_device.PandoraDevice = self.pandora_devices[1]
+        self.ref: pandora_device.BumblePandoraDevice = self.pandora_devices[1]
 
     @avatar.asynchronous
     async def setup_test(self):
-        if self.user_params.get('factory_reset_on_setup_test', False):
+        if self.user_params.get('factory_reset', False):
             await asyncio.gather(
                 self.dut.host.FactoryReset(),
                 self.ref.host.FactoryReset()
             )
-        elif self.user_params.get('reset_on_setup_test', False):
+        else:
             await asyncio.gather(
                 self.dut.host.Reset(),
                 self.ref.host.Reset()
@@ -73,9 +75,16 @@ class ExampleTest(base_test.BaseTestClass):
     def test_le_connect(self):
         self.dut.host.StartAdvertising(legacy=True, connectable=True)
         peers = self.ref.host.StartScanning()
-        dut = next((x for x in peers if x.public == self.dut.address))
-        connection = self.ref.host.ConnectLE(public=dut.public).connection
+        scan_response = next((x for x in peers if x.public == self.dut.address))
+        connection = self.ref.host.ConnectLE(public=scan_response.public).connection
         self.ref.host.Disconnect(connection=connection)
+
+    def test_le_connect_using_random_addresses(self):
+        self.ref.host.StartAdvertising(legacy=True, connectable=True, own_address_type=OwnAddressType.RANDOM)
+        peers = self.dut.host.StartScanning(own_address_type=OwnAddressType.RANDOM)
+        scan_response = next((x for x in peers if x.random == Address(self.ref.device.random_address)))
+        connection = self.dut.host.ConnectLE(random=scan_response.random, own_address_type=OwnAddressType.RANDOM).connection
+        self.dut.host.Disconnect(connection=connection)
 
     def test_not_discoverable(self):
         self.dut.host.SetDiscoverabilityMode(mode=DiscoverabilityMode.NOT_DISCOVERABLE)
@@ -116,7 +125,8 @@ class ExampleTest(base_test.BaseTestClass):
             scan_response_data=DataTypes(include_complete_local_name=True, include_class_of_device=True)
         )
 
-        scan_response = next((x for x in self.ref.host.StartScanning() if x.public == self.dut.address))
+        peers = self.ref.host.StartScanning()
+        scan_response = next((x for x in peers if x.public == self.dut.address))
         assert type(scan_response.data.complete_local_name) == str
         assert type(scan_response.data.shortened_local_name) == str
         assert type(scan_response.data.class_of_device) == int
