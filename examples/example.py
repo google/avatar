@@ -121,7 +121,11 @@ class ExampleTest(base_test.BaseTestClass):
     def test_scan_response_data(self):
         self.dut.host.StartAdvertising(
             legacy=True,
-            data=DataTypes(include_shortened_local_name=True, tx_power_level=42),
+            data=DataTypes(
+                include_shortened_local_name=True,
+                tx_power_level=42,
+                incomplete_service_class_uuids16=['FDF0']
+            ),
             scan_response_data=DataTypes(include_complete_local_name=True, include_class_of_device=True)
         )
 
@@ -130,6 +134,7 @@ class ExampleTest(base_test.BaseTestClass):
         assert type(scan_response.data.complete_local_name) == str
         assert type(scan_response.data.shortened_local_name) == str
         assert type(scan_response.data.class_of_device) == int
+        assert type(scan_response.data.incomplete_service_class_uuids16[0]) == str
         assert scan_response.data.tx_power_level == 42
 
 

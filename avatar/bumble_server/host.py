@@ -426,32 +426,32 @@ class HostService(HostServicer):
         if data := datas.incomplete_service_class_uuids16:
             res.ad_structures.append((
                 AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
-                bytes([reversed(bytes.fromhex(uuid)) for uuid in data])
+                b''.join([bytes(reversed(bytes.fromhex(uuid))) for uuid in data])
             ))
         if data := datas.complete_service_class_uuids16:
             res.ad_structures.append((
                 AdvertisingData.COMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
-                bytes([reversed(bytes.fromhex(uuid)) for uuid in data])
+                b''.join([bytes(reversed(bytes.fromhex(uuid))) for uuid in data])
             ))
         if data := datas.incomplete_service_class_uuids32:
             res.ad_structures.append((
                 AdvertisingData.INCOMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS,
-                bytes([reversed(bytes.fromhex(uuid)) for uuid in data])
+                b''.join([bytes(reversed(bytes.fromhex(uuid))) for uuid in data])
             ))
         if data := datas.complete_service_class_uuids32:
             res.ad_structures.append((
                 AdvertisingData.COMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS,
-                bytes([reversed(bytes.fromhex(uuid)) for uuid in data])
+                b''.join([bytes(reversed(bytes.fromhex(uuid))) for uuid in data])
             ))
         if data := datas.incomplete_service_class_uuids128:
             res.ad_structures.append((
                 AdvertisingData.INCOMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS,
-                bytes([reversed(bytes.fromhex(uuid)) for uuid in data])
+                b''.join([bytes(reversed(bytes.fromhex(uuid))) for uuid in data])
             ))
         if data := datas.complete_service_class_uuids128:
             res.ad_structures.append((
                 AdvertisingData.COMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS,
-                bytes([reversed(bytes.fromhex(uuid)) for uuid in data])
+                b''.join([bytes(reversed(bytes.fromhex(uuid))) for uuid in data])
             ))
         if datas.HasField('include_shortened_local_name'):
             res.ad_structures.append((
