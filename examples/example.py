@@ -17,6 +17,9 @@ import asyncio
 import logging
 import grpc
 
+from concurrent import futures
+from contextlib import suppress
+
 from mobly import test_runner, base_test
 
 from bumble.smp import PairingDelegate
@@ -27,7 +30,7 @@ from pandora.host_pb2 import (
     DiscoverabilityMode, DataTypes, OwnAddressType
 )
 from pandora.security_pb2 import (
-    PairingEventAnswer
+    PairingEventAnswer, SecurityLevel, LESecurityLevel
 )
 
 
@@ -146,48 +149,63 @@ class ExampleTest(base_test.BaseTestClass):
         # override reference device IO capability
         self.ref.device.io_capability = ref_io_capability
 
-        ref_answer_queue = AsyncQueue()
-        dut_answer_queue = AsyncQueue()
+        await self.ref.security_storage.DeleteBond(public=self.dut.address)
 
-        on_ref_pairing = self.ref.security.OnPairing(ref_answer_queue)
-        on_dut_pairing = self.dut.security.OnPairing(dut_answer_queue)
+        async def handle_pairing_events():
+            on_ref_pairing = self.ref.security.OnPairing((ref_answer_queue := AsyncQueue()))
+            on_dut_pairing = self.dut.security.OnPairing((dut_answer_queue := AsyncQueue()))
 
-        connect = self.ref.host.Connect(address=self.dut.address)
+            try:
+                while True:
+                    dut_pairing_event = await anext(aiter(on_dut_pairing))
+                    ref_pairing_event = await anext(aiter(on_ref_pairing))
 
-        dut_pairing_event = await anext(aiter(on_dut_pairing))
-        ref_pairing_event = await anext(aiter(on_ref_pairing))
+                    if dut_pairing_event.WhichOneof('method') in ('numeric_comparison', 'just_works'):
+                        assert ref_pairing_event.WhichOneof('method') in ('numeric_comparison', 'just_works')
+                        dut_answer_queue.put_nowait(PairingEventAnswer(
+                            event=dut_pairing_event,
+                            confirm=True,
+                        ))
+                        ref_answer_queue.put_nowait(PairingEventAnswer(
+                            event=ref_pairing_event,
+                            confirm=True,
+                        ))
+                    elif dut_pairing_event.WhichOneof('method') == 'passkey_entry_notification':
+                        assert ref_pairing_event.WhichOneof('method') == 'passkey_entry_request'
+                        ref_answer_queue.put_nowait(PairingEventAnswer(
+                            event=ref_pairing_event,
+                            passkey=dut_pairing_event.passkey_entry_notification,
+                        ))
+                    elif dut_pairing_event.WhichOneof('method') == 'passkey_entry_request':
+                        assert ref_pairing_event.WhichOneof('method') == 'passkey_entry_notification'
+                        dut_answer_queue.put_nowait(PairingEventAnswer(
+                            event=dut_pairing_event,
+                            passkey=ref_pairing_event.passkey_entry_notification,
+                        ))
+                    else:
+                        assert False
 
-        if dut_pairing_event.WhichOneof('method') in ('numeric_comparison', 'just_works'):
-            assert ref_pairing_event.WhichOneof('method') in ('numeric_comparison', 'just_works')
-            dut_answer_queue.put_nowait(PairingEventAnswer(
-                event=dut_pairing_event,
-                confirm=True,
-            ))
-            ref_answer_queue.put_nowait(PairingEventAnswer(
-                event=ref_pairing_event,
-                confirm=True,
-            ))
-        elif dut_pairing_event.WhichOneof('method') == 'passkey_entry_notification':
-            assert ref_pairing_event.WhichOneof('method') == 'passkey_entry_request'
-            ref_answer_queue.put_nowait(PairingEventAnswer(
-                event=ref_pairing_event,
-                passkey=dut_pairing_event.passkey_entry_notification,
-            ))
-        elif dut_pairing_event.WhichOneof('method') == 'passkey_entry_request':
-            assert ref_pairing_event.WhichOneof('method') == 'passkey_entry_notification'
-            dut_answer_queue.put_nowait(PairingEventAnswer(
-                event=dut_pairing_event,
-                passkey=ref_pairing_event.passkey_entry_notification,
-            ))
-        else:
-            assert False
+            finally:
+                on_ref_pairing.cancel()
+                on_dut_pairing.cancel()
 
-        connection = (await connect).connection
-        assert connection
-        await self.dut.host.Disconnect(connection=connection)
+        pairing = asyncio.create_task(handle_pairing_events())
+        ref_dut = (await self.ref.host.Connect(address=self.dut.address)).connection
+        dut_ref = (await self.dut.host.WaitConnection(address=self.ref.address)).connection
 
-        on_ref_pairing.cancel()
-        on_dut_pairing.cancel()
+        await asyncio.gather(
+            self.ref.security.Secure(connection=ref_dut, classic=SecurityLevel.LEVEL2),
+            self.dut.security.WaitSecurity(connection=dut_ref, classic=SecurityLevel.LEVEL2)
+        )
+
+        pairing.cancel()
+        with suppress(asyncio.CancelledError, futures.CancelledError):
+            await pairing
+
+        await asyncio.gather(
+            self.dut.host.Disconnect(connection=dut_ref),
+            self.ref.host.WaitDisconnection(connection=ref_dut)
+        )
 
     @avatar.parameterized([
         (OwnAddressType.PUBLIC, OwnAddressType.PUBLIC, PairingDelegate.NO_OUTPUT_NO_INPUT),
@@ -199,7 +217,8 @@ class ExampleTest(base_test.BaseTestClass):
         (OwnAddressType.RANDOM, OwnAddressType.RANDOM, PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT),
         (OwnAddressType.RANDOM, OwnAddressType.PUBLIC, PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT),
     ])
-    def test_le_pairing(self,
+    @avatar.asynchronous
+    async def test_le_pairing(self,
         dut_address_type: OwnAddressType,
         ref_address_type: OwnAddressType,
         ref_io_capability
@@ -207,55 +226,75 @@ class ExampleTest(base_test.BaseTestClass):
         # override reference device IO capability
         self.ref.device.io_capability = ref_io_capability
 
-        self.ref.host.StartAdvertising(legacy=True, connectable=True, own_address_type=ref_address_type)
-        ref_answer_queue = AsyncQueue()
-        dut_answer_queue = AsyncQueue()
-
-        on_ref_pairing = self.ref.security.OnPairing(ref_answer_queue)
-        on_dut_pairing = self.dut.security.OnPairing(dut_answer_queue)
-
         if ref_address_type in (OwnAddressType.PUBLIC, OwnAddressType.RESOLVABLE_OR_PUBLIC):
             ref_address = {'public': self.ref.address}
         else:
             ref_address = {'random': Address(self.ref.device.random_address)}
 
-        connection = self.dut.host.ConnectLE(own_address_type=dut_address_type, **ref_address).connection
-        assert connection
+        await self.dut.security_storage.DeleteBond(**ref_address)
+        await self.dut.host.StartAdvertising(legacy=True, connectable=True, own_address_type=dut_address_type)
 
-        self.dut.security.Pair(connection=connection)
-
-        dut_pairing_event = next(iter(on_dut_pairing))
-        ref_pairing_event = next(iter(on_ref_pairing))
-
-        if dut_pairing_event.WhichOneof('method') in ('numeric_comparison', 'just_works'):
-            assert ref_pairing_event.WhichOneof('method') == dut_pairing_event.WhichOneof('method')
-            dut_answer_queue.put_nowait(PairingEventAnswer(
-                event=dut_pairing_event,
-                confirm=True,
-            ))
-            ref_answer_queue.put_nowait(PairingEventAnswer(
-                event=ref_pairing_event,
-                confirm=True,
-            ))
-        elif dut_pairing_event.WhichOneof('method') == 'passkey_entry_notification':
-            assert ref_pairing_event.WhichOneof('method') == 'passkey_entry_request'
-            ref_answer_queue.put_nowait(PairingEventAnswer(
-                event=ref_pairing_event,
-                passkey=dut_pairing_event.passkey_entry_notification,
-            ))
-        elif dut_pairing_event.WhichOneof('method') == 'passkey_entry_request':
-            assert ref_pairing_event.WhichOneof('method') == 'passkey_entry_notification'
-            dut_answer_queue.put_nowait(PairingEventAnswer(
-                event=dut_pairing_event,
-                passkey=ref_pairing_event.passkey_entry_notification,
-            ))
+        dut = await anext(aiter(self.ref.host.Scan(own_address_type=ref_address_type)))
+        if dut_address_type in (OwnAddressType.PUBLIC, OwnAddressType.RESOLVABLE_OR_PUBLIC):
+            dut_address = {'public': Address(dut.public)}
         else:
-            assert False
+            dut_address = {'random': Address(dut.random)}
 
-        self.ref.host.Disconnect(connection=connection)
+        async def handle_pairing_events():
+            on_ref_pairing = self.ref.security.OnPairing((ref_answer_queue := AsyncQueue()))
+            on_dut_pairing = self.dut.security.OnPairing((dut_answer_queue := AsyncQueue()))
 
-        on_ref_pairing.cancel()
-        on_dut_pairing.cancel()
+            try:
+                while True:
+                    dut_pairing_event = await anext(aiter(on_dut_pairing))
+                    ref_pairing_event = await anext(aiter(on_ref_pairing))
+
+                    if dut_pairing_event.WhichOneof('method') in ('numeric_comparison', 'just_works'):
+                        assert ref_pairing_event.WhichOneof('method') in ('numeric_comparison', 'just_works')
+                        dut_answer_queue.put_nowait(PairingEventAnswer(
+                            event=dut_pairing_event,
+                            confirm=True,
+                        ))
+                        ref_answer_queue.put_nowait(PairingEventAnswer(
+                            event=ref_pairing_event,
+                            confirm=True,
+                        ))
+                    elif dut_pairing_event.WhichOneof('method') == 'passkey_entry_notification':
+                        assert ref_pairing_event.WhichOneof('method') == 'passkey_entry_request'
+                        ref_answer_queue.put_nowait(PairingEventAnswer(
+                            event=ref_pairing_event,
+                            passkey=dut_pairing_event.passkey_entry_notification,
+                        ))
+                    elif dut_pairing_event.WhichOneof('method') == 'passkey_entry_request':
+                        assert ref_pairing_event.WhichOneof('method') == 'passkey_entry_notification'
+                        dut_answer_queue.put_nowait(PairingEventAnswer(
+                            event=dut_pairing_event,
+                            passkey=ref_pairing_event.passkey_entry_notification,
+                        ))
+                    else:
+                        assert False
+
+            finally:
+                on_ref_pairing.cancel()
+                on_dut_pairing.cancel()
+
+        pairing = asyncio.create_task(handle_pairing_events())
+        ref_dut = (await self.ref.host.ConnectLE(own_address_type=ref_address_type, **dut_address)).connection
+        dut_ref = (await self.dut.host.WaitLEConnection(**ref_address)).connection
+
+        await asyncio.gather(
+            self.ref.security.Secure(connection=ref_dut, le=LESecurityLevel.LE_LEVEL4),
+            self.dut.security.WaitSecurity(connection=dut_ref, le=LESecurityLevel.LE_LEVEL4)
+        )
+
+        pairing.cancel()
+        with suppress(asyncio.CancelledError, futures.CancelledError):
+            await pairing
+
+        await asyncio.gather(
+            self.dut.host.Disconnect(connection=dut_ref),
+            self.ref.host.WaitDisconnection(connection=ref_dut)
+        )
 
 
 if __name__ == '__main__':

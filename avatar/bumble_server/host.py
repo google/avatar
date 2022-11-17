@@ -44,7 +44,7 @@ from pandora.host_pb2 import (
 from pandora.host_pb2 import (
     ReadLocalAddressResponse,
     ConnectResponse, GetConnectionResponse, WaitConnectionResponse,
-    ConnectLEResponse, GetLEConnectionResponse,
+    ConnectLEResponse, GetLEConnectionResponse, WaitLEConnectionResponse,
     StartAdvertisingResponse, ScanningResponse, InquiryResponse,
     GetRemoteNameResponse
 )
@@ -70,6 +70,10 @@ class HostService(HostServicer):
     async def FactoryReset(self, request, context):
         logging.info('FactoryReset')
 
+        # delete all bonds
+        if self.device.keystore is not None:
+            await self.device.keystore.delete_all()
+
         # trigger gRCP server stop then return
         asyncio.create_task(self.grpc_server.stop(None))
         return Empty()
@@ -87,9 +91,6 @@ class HostService(HostServicer):
             address=bytes(reversed(bytes(self.device.public_address))))
 
     async def Connect(self, request, context):
-        # TODO: add support for `request.manually_confirm`
-        assert not request.manually_confirm
-
         # Need to reverse bytes order since Bumble Address is using MSB.
         address = Address(bytes(reversed(request.address)), address_type=Address.PUBLIC_DEVICE_ADDRESS)
         logging.info(f"Connect: {address}")
@@ -106,23 +107,6 @@ class HostService(HostServicer):
                 logging.warning(f"Connection already exists: {e}")
                 return ConnectResponse(connection_already_exists=Empty())
             raise e
-
-        if not request.skip_pairing:
-            try:
-                logging.info("Authenticating...")
-                await self.device.authenticate(connection)
-                logging.info("Authenticated")
-            except HCI_Error as e:
-                logging.warning(f"Authentication failure: {e}")
-                return ConnectResponse(authentication_failure=Empty())
-
-            try:
-                logging.info("Enabling encryption...")
-                await self.device.encrypt(connection)
-                logging.info("Encryption on")
-            except HCI_Error as e:
-                logging.warning(f"Encryption failure: {e}")
-                return ConnectResponse(encryption_failure=Empty())
 
         logging.info(f"Connect: connection handle: {connection.handle}")
         cookie = Any(value=connection.handle.to_bytes(4, 'big'))
@@ -146,9 +130,17 @@ class HostService(HostServicer):
         # Need to reverse bytes order since Bumble Address is using MSB.
         if request.address:
             address = Address(bytes(reversed(request.address)), address_type=Address.PUBLIC_DEVICE_ADDRESS)
+            logging.info(f"WaitConnection: {address}")
+
+            connection = self.device.find_connection_by_bd_addr(
+                address, transport=BT_BR_EDR_TRANSPORT)
+
+            if connection:
+                cookie = Any(value=connection.handle.to_bytes(4, 'big'))
+                return WaitConnectionResponse(connection=Connection(cookie=cookie))
         else:
             address = Address.ANY
-        logging.info(f"WaitConnection: {address}")
+            logging.info(f"WaitConnection: {address}")
 
         logging.info("Wait connection...")
         connection = await self.device.accept(address)
@@ -197,6 +189,13 @@ class HostService(HostServicer):
         address = address_from_request(request, request.WhichOneof("address"))
         logging.info(f"WaitLEConnection: {address}")
 
+        connection = self.device.find_connection_by_bd_addr(
+            address, transport=BT_LE_TRANSPORT, check_address_type=True)
+
+        if connection:
+            cookie = Any(value=connection.handle.to_bytes(4, 'big'))
+            return WaitLEConnectionResponse(connection=Connection(cookie=cookie))
+
         pending_connection = asyncio.get_running_loop().create_future()
         handler = self.device.on('connection', lambda connection:
             pending_connection.set_result(connection)
@@ -208,7 +207,7 @@ class HostService(HostServicer):
         try:
             connection = await pending_connection
             cookie = Any(value=connection.handle.to_bytes(4, 'big'))
-            return GetLEConnectionResponse(connection=Connection(cookie=cookie))
+            return WaitLEConnectionResponse(connection=Connection(cookie=cookie))
         finally:
             self.device.remove_listener('connection', handler)
             self.device.remove_listener('connection_failure', failure_handler)
