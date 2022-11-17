@@ -2,8 +2,6 @@
 
 TestBeds:
 - Name: ExampleTest
-  TestParams:
-    factory_reset: False
   Controllers:
     PandoraDevice:
     - class: AndroidPandoraDevice

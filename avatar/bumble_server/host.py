@@ -14,6 +14,7 @@
 
 import asyncio
 import logging
+import grpc
 import struct
 
 from avatar.bumble_server.utils import address_from_request
@@ -52,11 +53,9 @@ from pandora.host_pb2 import (
 
 class HostService(HostServicer):
 
-    def __init__(self, server):
-        self.server = server
+    def __init__(self, grpc_server: grpc.aio.Server, device: Device):
         super().__init__()
-
-    async def set_device(self, device: Device):
+        self.grpc_server = grpc_server
         self.device = device
         self.device.pairing_config_factory = lambda connection: PairingConfig(bonding=False)
         self.scan_queue = asyncio.Queue()
@@ -64,17 +63,23 @@ class HostService(HostServicer):
         self.discoverability_mode = DiscoverabilityMode.NOT_DISCOVERABLE
         self.connectability_mode = ConnectabilityMode.CONNECTABLE
 
+    async def start(self) -> "HostService":
         # According to `host.proto`:
         # At startup, the Host must be in BR/EDR connectable mode
         await self.device.set_scan_enable(False, True)
+        return self
 
     async def FactoryReset(self, request, context):
         logging.info('FactoryReset')
-        await self.server.reset()
+
+        # trigger gRCP server stop then return
+        asyncio.create_task(self.grpc_server.stop(None))
         return Empty()
 
     async def Reset(self, request, context):
         logging.info('Reset')
+
+        # (re) power device on
         await self.device.power_on()
         return Empty()
 

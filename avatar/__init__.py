@@ -21,9 +21,9 @@ __version__ = "0.0.1"
 
 
 import asyncio
+import functools
 
 from threading import Thread
-from mobly import base_test
 
 
 # Keep running an event loop is a separate thread,
@@ -31,13 +31,48 @@ from mobly import base_test
 #   * Schedule Bumble(s) IO & gRPC server.
 #   * Schedule asynchronous tests.
 loop = asyncio.new_event_loop()
-thread = Thread(target=loop.run_forever, daemon=True)
+
+def thread_loop():
+    loop.run_forever()
+    loop.run_until_complete(loop.shutdown_asyncgens())
+
+thread = Thread(target=thread_loop, daemon=True)
 thread.start()
 
 
-# Convert an asynchronous test function to a synchronous one by
+# run coroutine into our loop until complete
+def run_until_complete(coro):
+    return asyncio.run_coroutine_threadsafe(coro, loop).result()
+
+
+# Convert an asynchronous function to a synchronous one by
 # executing it's code within our loop
-def asynchronous(test):
-    def wrapper(self: base_test.BaseTestClass):
-        return asyncio.run_coroutine_threadsafe(test(self), loop).result()
+def asynchronous(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        return run_until_complete(func(*args, **kwargs))
+    return wrapper
+
+
+# Multiply the same function from `inputs` parameters
+def parameterized(inputs):
+    class wrapper(object):
+        def __init__(self, func):
+            self.func = func
+
+        def __set_name__(self, owner, name):
+            for input in inputs:
+                if type(input) != tuple:
+                    raise ValueError(f'input type {type(input)} shall be a tuple')
+
+                def decorate(input):
+                    @functools.wraps(self.func)
+                    def wrapper(*args, **kwargs):
+                        return self.func(*args, *input, **kwargs)
+                    return wrapper
+
+                # we need to pass `input` here, otherwise it will be set to the value
+                # from the last iteration of `inputs`
+                setattr(owner, f"{name}{input}", decorate(input))
+
     return wrapper

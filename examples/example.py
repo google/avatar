@@ -34,23 +34,9 @@ class ExampleTest(base_test.BaseTestClass):
 
     @avatar.asynchronous
     async def setup_test(self):
-        if self.user_params.get('factory_reset', False):
-            await asyncio.gather(
-                self.dut.host.FactoryReset(),
-                self.ref.host.FactoryReset()
-            )
-        else:
-            await asyncio.gather(
-                self.dut.host.Reset(),
-                self.ref.host.Reset()
-            )
-
-        dut_res, ref_res = await asyncio.gather(
-            self.dut.host.ReadLocalAddress(),
-            self.ref.host.ReadLocalAddress()
-        )
-
-        self.dut.address, self.ref.address = Address(dut_res.address), Address(ref_res.address)
+        await asyncio.gather(*(x.host.FactoryReset() for x in (self.dut, self.ref)))
+        responses = await asyncio.gather(*(x.host.ReadLocalAddress(wait_for_ready=True) for x in (self.dut, self.ref)))
+        self.dut.address, self.ref.address = responses[0].address, responses[1].address
 
     def test_print_addresses(self):
         dut_address = self.dut.address
@@ -72,36 +58,42 @@ class ExampleTest(base_test.BaseTestClass):
         self.ref.log.info(f'Connected with: "{dut_name}" {dut_address}')
         self.ref.host.Disconnect(connection=connection)
 
-    def test_le_connect(self):
-        self.dut.host.StartAdvertising(legacy=True, connectable=True)
-        peers = self.ref.host.Scan()
-        scan_response = next((x for x in peers if x.public == self.dut.address))
-        connection = self.ref.host.ConnectLE(public=scan_response.public).connection
-        self.ref.host.Disconnect(connection=connection)
-
-    def test_le_connect_using_random_addresses(self):
-        self.ref.host.StartAdvertising(legacy=True, connectable=True, own_address_type=OwnAddressType.RANDOM)
-        peers = self.dut.host.Scan(own_address_type=OwnAddressType.RANDOM)
-        scan_response = next((x for x in peers if x.random == Address(self.ref.device.random_address)))
-        connection = self.dut.host.ConnectLE(random=scan_response.random, own_address_type=OwnAddressType.RANDOM).connection
+    # Using this decorator allow us to write one `test_le_connect`, and
+    # run it multiple time with different parameters.
+    # Here we check that no matter the address type we use for both sides
+    # the connection still complete.
+    @avatar.parameterized([
+        (OwnAddressType.PUBLIC, OwnAddressType.PUBLIC),
+        (OwnAddressType.PUBLIC, OwnAddressType.RANDOM),
+        (OwnAddressType.RANDOM, OwnAddressType.RANDOM),
+        (OwnAddressType.RANDOM, OwnAddressType.PUBLIC),
+    ])
+    def test_le_connect(self, dut_address_type: OwnAddressType, ref_address_type: OwnAddressType):
+        self.ref.host.StartAdvertising(legacy=True, connectable=True, own_address_type=ref_address_type)
+        peers = self.dut.host.Scan(own_address_type=dut_address_type)
+        if ref_address_type == OwnAddressType.PUBLIC:
+            scan_response = next((x for x in peers if x.public == self.ref.address))
+            connection = self.dut.host.ConnectLE(public=scan_response.public, own_address_type=dut_address_type).connection
+        else:
+            scan_response = next((x for x in peers if x.random == Address(self.ref.device.random_address)))
+            connection = self.dut.host.ConnectLE(random=scan_response.random, own_address_type=dut_address_type).connection
         self.dut.host.Disconnect(connection=connection)
 
     def test_not_discoverable(self):
         self.dut.host.SetDiscoverabilityMode(mode=DiscoverabilityMode.NOT_DISCOVERABLE)
-        peers = self.ref.host.Inquiry(timeout=2.0)
+        peers = self.ref.host.Inquiry(timeout=3.0)
         try:
             assert not next((x for x in peers if x.address == self.dut.address), None)
         except grpc.RpcError as e:
             assert e.code() == grpc.StatusCode.DEADLINE_EXCEEDED
 
-    def test_discoverable_limited(self):
-        self.dut.host.SetDiscoverabilityMode(mode=DiscoverabilityMode.DISCOVERABLE_LIMITED)
-        peers = self.ref.host.Inquiry(timeout=2.0)
-        assert next((x for x in peers if x.address == self.dut.address), None)
-
-    def test_discoverable_general(self):
-        self.dut.host.SetDiscoverabilityMode(mode=DiscoverabilityMode.DISCOVERABLE_GENERAL)
-        peers = self.ref.host.Inquiry(timeout=2.0)
+    @avatar.parameterized([
+        (DiscoverabilityMode.DISCOVERABLE_LIMITED, ),
+        (DiscoverabilityMode.DISCOVERABLE_GENERAL, ),
+    ])
+    def test_discoverable(self, mode):
+        self.dut.host.SetDiscoverabilityMode(mode=mode)
+        peers = self.ref.host.Inquiry(timeout=15.0)
         assert next((x for x in peers if x.address == self.dut.address), None)
 
     @avatar.asynchronous
