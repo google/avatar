@@ -74,21 +74,21 @@ class ExampleTest(base_test.BaseTestClass):
 
     def test_le_connect(self):
         self.dut.host.StartAdvertising(legacy=True, connectable=True)
-        peers = self.ref.host.StartScanning()
+        peers = self.ref.host.Scan()
         scan_response = next((x for x in peers if x.public == self.dut.address))
         connection = self.ref.host.ConnectLE(public=scan_response.public).connection
         self.ref.host.Disconnect(connection=connection)
 
     def test_le_connect_using_random_addresses(self):
         self.ref.host.StartAdvertising(legacy=True, connectable=True, own_address_type=OwnAddressType.RANDOM)
-        peers = self.dut.host.StartScanning(own_address_type=OwnAddressType.RANDOM)
+        peers = self.dut.host.Scan(own_address_type=OwnAddressType.RANDOM)
         scan_response = next((x for x in peers if x.random == Address(self.ref.device.random_address)))
         connection = self.dut.host.ConnectLE(random=scan_response.random, own_address_type=OwnAddressType.RANDOM).connection
         self.dut.host.Disconnect(connection=connection)
 
     def test_not_discoverable(self):
         self.dut.host.SetDiscoverabilityMode(mode=DiscoverabilityMode.NOT_DISCOVERABLE)
-        peers = self.ref.host.StartInquiry(timeout=2.0)
+        peers = self.ref.host.Inquiry(timeout=2.0)
         try:
             assert not next((x for x in peers if x.address == self.dut.address), None)
         except grpc.RpcError as e:
@@ -96,12 +96,12 @@ class ExampleTest(base_test.BaseTestClass):
 
     def test_discoverable_limited(self):
         self.dut.host.SetDiscoverabilityMode(mode=DiscoverabilityMode.DISCOVERABLE_LIMITED)
-        peers = self.ref.host.StartInquiry(timeout=2.0)
+        peers = self.ref.host.Inquiry(timeout=2.0)
         assert next((x for x in peers if x.address == self.dut.address), None)
 
     def test_discoverable_general(self):
         self.dut.host.SetDiscoverabilityMode(mode=DiscoverabilityMode.DISCOVERABLE_GENERAL)
-        peers = self.ref.host.StartInquiry(timeout=2.0)
+        peers = self.ref.host.Inquiry(timeout=2.0)
         assert next((x for x in peers if x.address == self.dut.address), None)
 
     @avatar.asynchronous
@@ -129,7 +129,7 @@ class ExampleTest(base_test.BaseTestClass):
             scan_response_data=DataTypes(include_complete_local_name=True, include_class_of_device=True)
         )
 
-        peers = self.ref.host.StartScanning()
+        peers = self.ref.host.Scan()
         scan_response = next((x for x in peers if x.public == self.dut.address))
         assert type(scan_response.data.complete_local_name) == str
         assert type(scan_response.data.shortened_local_name) == str

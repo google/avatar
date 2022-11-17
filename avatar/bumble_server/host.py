@@ -16,6 +16,8 @@ import asyncio
 import logging
 import struct
 
+from avatar.bumble_server.utils import address_from_request
+
 from bumble.smp import PairingConfig
 from bumble.core import (
     BT_BR_EDR_TRANSPORT, BT_LE_TRANSPORT,
@@ -31,8 +33,8 @@ from bumble.hci import (
     Address, HCI_Error
 )
 
-from google.protobuf import empty_pb2
-from google.protobuf import any_pb2
+from google.protobuf.empty_pb2 import Empty
+from google.protobuf.any_pb2 import Any
 
 from pandora.host_grpc import HostServicer
 from pandora.host_pb2 import (
@@ -69,12 +71,12 @@ class HostService(HostServicer):
     async def FactoryReset(self, request, context):
         logging.info('FactoryReset')
         await self.server.reset()
-        return empty_pb2.Empty()
+        return Empty()
 
     async def Reset(self, request, context):
         logging.info('Reset')
         await self.device.power_on()
-        return empty_pb2.Empty()
+        return Empty()
 
     async def ReadLocalAddress(self, request, context):
         logging.info('ReadLocalAddress')
@@ -96,10 +98,10 @@ class HostService(HostServicer):
         except ConnectionError as e:
             if e.error_code == HCI_PAGE_TIMEOUT_ERROR:
                 logging.warning(f"Peer not found: {e}")
-                return ConnectResponse(peer_not_found=empty_pb2.Empty())
+                return ConnectResponse(peer_not_found=Empty())
             if e.error_code == HCI_CONNECTION_ALREADY_EXISTS_ERROR:
                 logging.warning(f"Connection already exists: {e}")
-                return ConnectResponse(connection_already_exists=empty_pb2.Empty())
+                return ConnectResponse(connection_already_exists=Empty())
             raise e
 
         if not request.skip_pairing:
@@ -109,7 +111,7 @@ class HostService(HostServicer):
                 logging.info("Authenticated")
             except HCI_Error as e:
                 logging.warning(f"Authentication failure: {e}")
-                return ConnectResponse(authentication_failure=empty_pb2.Empty())
+                return ConnectResponse(authentication_failure=Empty())
 
             try:
                 logging.info("Enabling encryption...")
@@ -117,10 +119,10 @@ class HostService(HostServicer):
                 logging.info("Encryption on")
             except HCI_Error as e:
                 logging.warning(f"Encryption failure: {e}")
-                return ConnectResponse(encryption_failure=empty_pb2.Empty())
+                return ConnectResponse(encryption_failure=Empty())
 
         logging.info(f"Connect: connection handle: {connection.handle}")
-        cookie = any_pb2.Any(value=connection.handle.to_bytes(4, 'big'))
+        cookie = Any(value=connection.handle.to_bytes(4, 'big'))
         return ConnectResponse(connection=Connection(cookie=cookie))
 
     async def GetConnection(self, request, context):
@@ -132,9 +134,9 @@ class HostService(HostServicer):
             address, transport=BT_BR_EDR_TRANSPORT)
 
         if not connection:
-            return GetConnectionResponse(peer_not_found=empty_pb2.Empty())
+            return GetConnectionResponse(peer_not_found=Empty())
 
-        cookie = any_pb2.Any(value=connection.handle.to_bytes(4, 'big'))
+        cookie = Any(value=connection.handle.to_bytes(4, 'big'))
         return GetConnectionResponse(connection=Connection(cookie=cookie))
 
     async def WaitConnection(self, request, context):
@@ -150,22 +152,11 @@ class HostService(HostServicer):
         logging.info("Connected")
 
         logging.info(f"WaitConnection: connection handle: {connection.handle}")
-        cookie = any_pb2.Any(value=connection.handle.to_bytes(4, 'big'))
+        cookie = Any(value=connection.handle.to_bytes(4, 'big'))
         return WaitConnectionResponse(connection=Connection(cookie=cookie))
 
     async def ConnectLE(self, request, context):
-        # Need to reverse bytes order since Bumble Address is using MSB.
-        if request.WhichOneof("address") == "public":
-            address = Address(bytes(reversed(request.public)), Address.PUBLIC_DEVICE_ADDRESS)
-        elif request.WhichOneof("address") == "random":
-            address = Address(bytes(reversed(request.random)), Address.RANDOM_DEVICE_ADDRESS)
-        elif request.WhichOneof("address") == "public_identity":
-            address = Address(bytes(reversed(request.public_identity)), Address.PUBLIC_IDENTITY_ADDRESS)
-        elif request.WhichOneof("address") == "random_static_identity":
-            address = Address(bytes(reversed(request.random_static_identity)), Address.RANDOM_IDENTITY_ADDRESS)
-        else:
-            raise ValueError('missing address parameter')
-
+        address = address_from_request(request, request.WhichOneof("address"))
         logging.info(f"ConnectLE: {address}")
 
         try:
@@ -176,53 +167,31 @@ class HostService(HostServicer):
         except ConnectionError as e:
             if e.error_code == HCI_PAGE_TIMEOUT_ERROR:
                 logging.warning(f"Peer not found: {e}")
-                return ConnectLEResponse(peer_not_found=empty_pb2.Empty())
+                return ConnectLEResponse(peer_not_found=Empty())
             if e.error_code == HCI_CONNECTION_ALREADY_EXISTS_ERROR:
                 logging.warning(f"Connection already exists: {e}")
-                return ConnectLEResponse(connection_already_exists=empty_pb2.Empty())
+                return ConnectLEResponse(connection_already_exists=Empty())
             raise e
 
         logging.info(f"ConnectLE: connection handle: {connection.handle}")
-        cookie = any_pb2.Any(value=connection.handle.to_bytes(4, 'big'))
+        cookie = Any(value=connection.handle.to_bytes(4, 'big'))
         return ConnectLEResponse(connection=Connection(cookie=cookie))
 
     async def GetLEConnection(self, request, context):
-        # Need to reverse bytes order since Bumble Address is using MSB.
-        if request.WhichOneof("address") == "public":
-            address = Address(bytes(reversed(request.public)), Address.PUBLIC_DEVICE_ADDRESS)
-        elif request.WhichOneof("address") == "random":
-            address = Address(bytes(reversed(request.random)), Address.RANDOM_DEVICE_ADDRESS)
-        elif request.WhichOneof("address") == "public_identity":
-            address = Address(bytes(reversed(request.public_identity)), Address.PUBLIC_IDENTITY_ADDRESS)
-        elif request.WhichOneof("address") == "random_static_identity":
-            address = Address(bytes(reversed(request.random_static_identity)), Address.RANDOM_IDENTITY_ADDRESS)
-        else:
-            raise ValueError('missing address parameter')
-
+        address = address_from_request(request, request.WhichOneof("address"))
         logging.info(f"GetLEConnection: {address}")
 
         connection = self.device.find_connection_by_bd_addr(
             address, transport=BT_LE_TRANSPORT, check_address_type=True)
 
         if not connection:
-            return GetLEConnectionResponse(peer_not_found=empty_pb2.Empty())
+            return GetLEConnectionResponse(peer_not_found=Empty())
 
-        cookie = any_pb2.Any(value=connection.handle.to_bytes(4, 'big'))
+        cookie = Any(value=connection.handle.to_bytes(4, 'big'))
         return GetLEConnectionResponse(connection=Connection(cookie=cookie))
 
     async def WaitLEConnection(self, request, context):
-        # Need to reverse bytes order since Bumble Address is using MSB.
-        if request.WhichOneof("address") == "public":
-            address = Address(bytes(reversed(request.public)), Address.PUBLIC_DEVICE_ADDRESS)
-        elif request.WhichOneof("address") == "random":
-            address = Address(bytes(reversed(request.random)), Address.RANDOM_DEVICE_ADDRESS)
-        elif request.WhichOneof("address") == "public_identity":
-            address = Address(bytes(reversed(request.public_identity)), Address.PUBLIC_IDENTITY_ADDRESS)
-        elif request.WhichOneof("address") == "random_static_identity":
-            address = Address(bytes(reversed(request.random_static_identity)), Address.RANDOM_IDENTITY_ADDRESS)
-        else:
-            raise ValueError('missing address parameter')
-
+        address = address_from_request(request, request.WhichOneof("address"))
         logging.info(f"WaitLEConnection: {address}")
 
         pending_connection = asyncio.get_running_loop().create_future()
@@ -235,7 +204,7 @@ class HostService(HostServicer):
 
         try:
             connection = await pending_connection
-            cookie = any_pb2.Any(value=connection.handle.to_bytes(4, 'big'))
+            cookie = Any(value=connection.handle.to_bytes(4, 'big'))
             return GetLEConnectionResponse(connection=Connection(cookie=cookie))
         finally:
             self.device.remove_listener('connection', handler)
@@ -250,7 +219,19 @@ class HostService(HostServicer):
         await connection.disconnect(HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR)
         logging.info("Disconnected")
 
-        return empty_pb2.Empty()
+        return Empty()
+
+    async def WaitDisconnection(self, request, context):
+        connection_handle = int.from_bytes(request.connection.cookie.value, 'big')
+        logging.info(f"WaitDisconnection: {connection_handle}")
+
+        if (connection := self.device.lookup_connection(connection_handle)):
+            disconnection_future = asyncio.get_running_loop().create_future()
+            connection.on('disconnection', lambda _: disconnection_future.set_result(True))
+            await disconnection_future
+            logging.info("Disconnected")
+
+        return Empty()
 
     # TODO: use advertising set commands
     async def StartAdvertising(self, request, context):
@@ -304,13 +285,13 @@ class HostService(HostServicer):
     async def StopAdvertising(self, request, context):
         logging.info('StopAdvertising')
         await self.device.stop_advertising()
-        return empty_pb2.Empty()
+        return Empty()
 
-    async def StartScanning(self, request, context):
+    async def Scan(self, request, context):
         # TODO: add support for `request.phys`
         assert not request.phys
 
-        logging.info('StartScanning')
+        logging.info('Scan')
 
         handler = self.device.on('advertisement', self.scan_queue.put_nowait)
         await self.device.start_scanning(
@@ -354,8 +335,8 @@ class HostService(HostServicer):
             self.scan_queue = asyncio.Queue()
             await self.device.stop_scanning()
 
-    async def StartInquiry(self, request, context):
-        logging.info('StartInquiry')
+    async def Inquiry(self, request, context):
+        logging.info('Inquiry')
 
         complete_handler = self.device.on('inquiry_complete', lambda: self.inquiry_queue.put_nowait(None))
         result_handler = self.device.on(
@@ -389,7 +370,7 @@ class HostService(HostServicer):
             self.discoverability_mode != DiscoverabilityMode.NOT_DISCOVERABLE,
             self.connectability_mode != ConnectabilityMode.NOT_CONNECTABLE
         )
-        return empty_pb2.Empty()
+        return Empty()
 
     async def SetConnectabilityMode(self, request, context):
         logging.info("SetConnectabilityMode")
@@ -398,7 +379,7 @@ class HostService(HostServicer):
             self.discoverability_mode != DiscoverabilityMode.NOT_DISCOVERABLE,
             self.connectability_mode != ConnectabilityMode.NOT_CONNECTABLE
         )
-        return empty_pb2.Empty()
+        return Empty()
 
     async def GetRemoteName(self, request, context):
         if request.WhichOneof('remote') == 'connection':
@@ -417,7 +398,7 @@ class HostService(HostServicer):
         except HCI_Error as e:
             if e.error_code == HCI_PAGE_TIMEOUT_ERROR:
                 logging.warning(f"Peer not found: {e}")
-                return GetRemoteNameResponse(peer_not_found=empty_pb2.Empty())
+                return GetRemoteNameResponse(peer_not_found=Empty())
             raise e
 
 
