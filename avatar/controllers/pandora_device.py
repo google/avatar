@@ -29,6 +29,7 @@ from ..bumble_server import BumblePandoraServer
 from ..utils import Address
 
 from pandora.host_grpc import Host
+from pandora.security_grpc import Security
 
 from bumble.device import Device
 
@@ -79,6 +80,9 @@ class PandoraDevice:
     def host(self) -> Host:
         return Host(self.channel)
 
+    @property
+    def security(self) -> Security:
+        return Security(self.channel)
 
 class PandoraDeviceLoggerAdapter(logging.LoggerAdapter):
 

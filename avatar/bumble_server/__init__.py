@@ -24,12 +24,16 @@ import random
 import sys
 import traceback
 
+from bumble.smp import PairingDelegate
 from bumble.host import Host
 from bumble.device import Device, DeviceConfiguration
 from bumble.transport import open_transport
 
 from .host import HostService
 from pandora.host_grpc import add_HostServicer_to_server
+
+from .security import SecurityService
+from pandora.security_grpc import add_SecurityServicer_to_server
 
 BUMBLE_SERVER_GRPC_PORT = 7999
 ROOTCANAL_PORT_CUTTLEFISH = 7300
@@ -56,12 +60,15 @@ class BumblePandoraServer:
 
         # FIXME: add `classic_enabled` to `DeviceConfiguration` ?
         self.device.classic_enabled = self.config.get('classic_enabled', False)
+        io_capability_name = self.config.get('io_capability', 'no_output_no_input').upper()
+        io_capability = getattr(PairingDelegate, io_capability_name)
 
         # start bumble device
         await self.device.power_on()
 
         # add our services to the gRPC server
         add_HostServicer_to_server(await HostService(grpc_server, self.device).start(), grpc_server)
+        add_SecurityServicer_to_server(SecurityService(self.device, io_capability), grpc_server)
 
     async def close(self):
         await self.hci.close()

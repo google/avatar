@@ -19,7 +19,6 @@ import struct
 
 from avatar.bumble_server.utils import address_from_request
 
-from bumble.smp import PairingConfig
 from bumble.core import (
     BT_BR_EDR_TRANSPORT, BT_LE_TRANSPORT,
     AdvertisingData, ConnectionError
@@ -57,7 +56,6 @@ class HostService(HostServicer):
         super().__init__()
         self.grpc_server = grpc_server
         self.device = device
-        self.device.pairing_config_factory = lambda connection: PairingConfig(bonding=False)
         self.scan_queue = asyncio.Queue()
         self.inquiry_queue = asyncio.Queue()
         self.discoverability_mode = DiscoverabilityMode.NOT_DISCOVERABLE

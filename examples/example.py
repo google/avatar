@@ -19,10 +19,15 @@ import grpc
 
 from mobly import test_runner, base_test
 
-from avatar.utils import Address
+from bumble.smp import PairingDelegate
+
+from avatar.utils import Address, AsyncQueue
 from avatar.controllers import pandora_device
 from pandora.host_pb2 import (
     DiscoverabilityMode, DataTypes, OwnAddressType
+)
+from pandora.security_pb2 import (
+    PairingEventAnswer
 )
 
 
@@ -128,6 +133,129 @@ class ExampleTest(base_test.BaseTestClass):
         assert type(scan_response.data.class_of_device) == int
         assert type(scan_response.data.incomplete_service_class_uuids16[0]) == str
         assert scan_response.data.tx_power_level == 42
+
+    @avatar.parameterized([
+        (PairingDelegate.NO_OUTPUT_NO_INPUT, ),
+        (PairingDelegate.KEYBOARD_INPUT_ONLY, ),
+        (PairingDelegate.DISPLAY_OUTPUT_ONLY, ),
+        (PairingDelegate.DISPLAY_OUTPUT_AND_YES_NO_INPUT, ),
+        (PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT, ),
+    ])
+    @avatar.asynchronous
+    async def test_classic_pairing(self, ref_io_capability):
+        # override reference device IO capability
+        self.ref.device.io_capability = ref_io_capability
+
+        ref_answer_queue = AsyncQueue()
+        dut_answer_queue = AsyncQueue()
+
+        on_ref_pairing = self.ref.security.OnPairing(ref_answer_queue)
+        on_dut_pairing = self.dut.security.OnPairing(dut_answer_queue)
+
+        connect = self.ref.host.Connect(address=self.dut.address)
+
+        dut_pairing_event = await anext(aiter(on_dut_pairing))
+        ref_pairing_event = await anext(aiter(on_ref_pairing))
+
+        if dut_pairing_event.WhichOneof('method') in ('numeric_comparison', 'just_works'):
+            assert ref_pairing_event.WhichOneof('method') in ('numeric_comparison', 'just_works')
+            dut_answer_queue.put_nowait(PairingEventAnswer(
+                event=dut_pairing_event,
+                confirm=True,
+            ))
+            ref_answer_queue.put_nowait(PairingEventAnswer(
+                event=ref_pairing_event,
+                confirm=True,
+            ))
+        elif dut_pairing_event.WhichOneof('method') == 'passkey_entry_notification':
+            assert ref_pairing_event.WhichOneof('method') == 'passkey_entry_request'
+            ref_answer_queue.put_nowait(PairingEventAnswer(
+                event=ref_pairing_event,
+                passkey=dut_pairing_event.passkey_entry_notification,
+            ))
+        elif dut_pairing_event.WhichOneof('method') == 'passkey_entry_request':
+            assert ref_pairing_event.WhichOneof('method') == 'passkey_entry_notification'
+            dut_answer_queue.put_nowait(PairingEventAnswer(
+                event=dut_pairing_event,
+                passkey=ref_pairing_event.passkey_entry_notification,
+            ))
+        else:
+            assert False
+
+        connection = (await connect).connection
+        assert connection
+        await self.dut.host.Disconnect(connection=connection)
+
+        on_ref_pairing.cancel()
+        on_dut_pairing.cancel()
+
+    @avatar.parameterized([
+        (OwnAddressType.PUBLIC, OwnAddressType.PUBLIC, PairingDelegate.NO_OUTPUT_NO_INPUT),
+        (OwnAddressType.PUBLIC, OwnAddressType.PUBLIC, PairingDelegate.KEYBOARD_INPUT_ONLY),
+        (OwnAddressType.PUBLIC, OwnAddressType.PUBLIC, PairingDelegate.DISPLAY_OUTPUT_ONLY),
+        (OwnAddressType.PUBLIC, OwnAddressType.PUBLIC, PairingDelegate.DISPLAY_OUTPUT_AND_YES_NO_INPUT),
+        (OwnAddressType.PUBLIC, OwnAddressType.PUBLIC, PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT),
+        (OwnAddressType.PUBLIC, OwnAddressType.RANDOM, PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT),
+        (OwnAddressType.RANDOM, OwnAddressType.RANDOM, PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT),
+        (OwnAddressType.RANDOM, OwnAddressType.PUBLIC, PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT),
+    ])
+    def test_le_pairing(self,
+        dut_address_type: OwnAddressType,
+        ref_address_type: OwnAddressType,
+        ref_io_capability
+    ):
+        # override reference device IO capability
+        self.ref.device.io_capability = ref_io_capability
+
+        self.ref.host.StartAdvertising(legacy=True, connectable=True, own_address_type=ref_address_type)
+        ref_answer_queue = AsyncQueue()
+        dut_answer_queue = AsyncQueue()
+
+        on_ref_pairing = self.ref.security.OnPairing(ref_answer_queue)
+        on_dut_pairing = self.dut.security.OnPairing(dut_answer_queue)
+
+        if ref_address_type in (OwnAddressType.PUBLIC, OwnAddressType.RESOLVABLE_OR_PUBLIC):
+            ref_address = {'public': self.ref.address}
+        else:
+            ref_address = {'random': Address(self.ref.device.random_address)}
+
+        connection = self.dut.host.ConnectLE(own_address_type=dut_address_type, **ref_address).connection
+        assert connection
+
+        self.dut.security.Pair(connection=connection)
+
+        dut_pairing_event = next(iter(on_dut_pairing))
+        ref_pairing_event = next(iter(on_ref_pairing))
+
+        if dut_pairing_event.WhichOneof('method') in ('numeric_comparison', 'just_works'):
+            assert ref_pairing_event.WhichOneof('method') == dut_pairing_event.WhichOneof('method')
+            dut_answer_queue.put_nowait(PairingEventAnswer(
+                event=dut_pairing_event,
+                confirm=True,
+            ))
+            ref_answer_queue.put_nowait(PairingEventAnswer(
+                event=ref_pairing_event,
+                confirm=True,
+            ))
+        elif dut_pairing_event.WhichOneof('method') == 'passkey_entry_notification':
+            assert ref_pairing_event.WhichOneof('method') == 'passkey_entry_request'
+            ref_answer_queue.put_nowait(PairingEventAnswer(
+                event=ref_pairing_event,
+                passkey=dut_pairing_event.passkey_entry_notification,
+            ))
+        elif dut_pairing_event.WhichOneof('method') == 'passkey_entry_request':
+            assert ref_pairing_event.WhichOneof('method') == 'passkey_entry_notification'
+            dut_answer_queue.put_nowait(PairingEventAnswer(
+                event=dut_pairing_event,
+                passkey=ref_pairing_event.passkey_entry_notification,
+            ))
+        else:
+            assert False
+
+        self.ref.host.Disconnect(connection=connection)
+
+        on_ref_pairing.cancel()
+        on_dut_pairing.cancel()
 
 
 if __name__ == '__main__':

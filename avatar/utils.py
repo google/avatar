@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
+import avatar
+
 from bumble.hci import Address as BumbleAddress
 
 
@@ -34,3 +37,18 @@ class Address(bytes):
 
     def __str__(self):
         return ':'.join([f'{x:02X}' for x in self])
+
+
+class AsyncQueue(asyncio.Queue):
+
+    def __aiter__(self):
+        return self
+
+    def __iter__(self):
+        return self
+
+    async def __anext__(self):
+        return await self.get()
+
+    def __next__(self):
+        return avatar.run_until_complete(self.__anext__())
