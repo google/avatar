@@ -35,6 +35,9 @@ from pandora.host_grpc import add_HostServicer_to_server
 from .security import SecurityService, SecurityStorageService
 from pandora.security_grpc import add_SecurityServicer_to_server, add_SecurityStorageServicer_to_server
 
+from pandora.asha_grpc import add_ASHAServicer_to_server
+from .asha import ASHAService
+
 BUMBLE_SERVER_GRPC_PORT = 7999
 ROOTCANAL_PORT_CUTTLEFISH = 7300
 
@@ -70,6 +73,7 @@ class BumblePandoraServer:
         add_HostServicer_to_server(await HostService(grpc_server, self.device).start(), grpc_server)
         add_SecurityServicer_to_server(SecurityService(self.device, io_capability), grpc_server)
         add_SecurityStorageServicer_to_server(SecurityStorageService(self.device), grpc_server)
+        add_ASHAServicer_to_server(ASHAService(self.device), grpc_server)
 
     async def close(self):
         await self.hci.close()

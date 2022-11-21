@@ -30,6 +30,7 @@ from ..utils import Address
 
 from pandora.host_grpc import Host
 from pandora.security_grpc import Security, SecurityStorage
+from pandora.asha_grpc import ASHA
 
 from bumble.device import Device
 
@@ -93,6 +94,10 @@ class PandoraDevice:
     @property
     def security_storage(self) -> SecurityStorage:
         return SecurityStorage(self.channel)
+
+    @property
+    def asha(self) -> ASHA:
+        return ASHA(self.channel)
 
 
 class PandoraDeviceLoggerAdapter(logging.LoggerAdapter):
