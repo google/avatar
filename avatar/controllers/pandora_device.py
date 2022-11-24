@@ -98,7 +98,7 @@ class PandoraDeviceLoggerAdapter(logging.LoggerAdapter):
 
 class AndroidPandoraDevice(PandoraDevice):
 
-    def __init__(self, **config):
+    def __init__(self, config):
         android_devices = mobly.controllers.android_device.create(config)
         if not android_devices:
             raise mobly.signals.ControllerError(
