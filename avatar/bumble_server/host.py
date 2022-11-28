@@ -400,7 +400,7 @@ class HostService(HostServicer):
         except HCI_Error as e:
             if e.error_code == HCI_PAGE_TIMEOUT_ERROR:
                 logging.warning(f"Peer not found: {e}")
-                return GetRemoteNameResponse(peer_not_found=Empty())
+                return GetRemoteNameResponse(remote_not_found=Empty())
             raise e
 
 
