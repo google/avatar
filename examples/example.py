@@ -42,9 +42,11 @@ class ExampleTest(base_test.BaseTestClass):
 
     @avatar.asynchronous
     async def setup_test(self):
-        await asyncio.gather(*(x.host.FactoryReset() for x in (self.dut, self.ref)))
-        responses = await asyncio.gather(*(x.host.ReadLocalAddress(wait_for_ready=True) for x in (self.dut, self.ref)))
-        self.dut.address, self.ref.address = responses[0].address, responses[1].address
+        async def reset(device: pandora_device.PandoraDevice):
+            await device.host.FactoryReset()
+            device.address = (await device.host.ReadLocalAddress(wait_for_ready=True)).address
+
+        await asyncio.gather(reset(self.dut), reset(self.ref))
 
     def test_print_addresses(self):
         dut_address = self.dut.address

@@ -54,19 +54,25 @@ class PandoraDevice:
 
     def __init__(self, target):
         self._address = Address(b'\x00\x00\x00\x00\x00\x00')
-        self.channels = (grpc.insecure_channel(target), grpc.aio.insecure_channel(target))
+        self._target = target
+        self._channel = grpc.insecure_channel(target)
+        self._aio_channel = None
         self.log = PandoraDeviceLoggerAdapter(logging.getLogger(), self)
 
     def destroy(self):
-        self.channels[0].close()
-        avatar.run_until_complete(self.channels[1].close())
+        self._channel.close()
+        if self._aio_channel:
+            avatar.run_until_complete(self._aio_channel.close())
 
     @property
     def channel(self):
         # Force the use of the asynchronous channel when running in our event loop.
         with contextlib.suppress(RuntimeError):
-            if asyncio.get_running_loop() == avatar.loop: return self.channels[1]
-        return self.channels[0]
+            if asyncio.get_running_loop() == avatar.loop:
+                if not self._aio_channel:
+                    self._aio_channel = grpc.aio.insecure_channel(self._target)
+                return self._aio_channel
+        return self._channel
 
     @property
     def address(self):
