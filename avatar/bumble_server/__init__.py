@@ -90,6 +90,7 @@ class BumblePandoraServer:
 
                 await grpc_server.start()
                 await grpc_server.wait_for_termination()
+                await server.close()
 
                 # re-initialize gRPC server
                 grpc_server = grpc.aio.server()
