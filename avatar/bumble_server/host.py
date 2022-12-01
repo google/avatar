@@ -351,7 +351,7 @@ class HostService(HostServicer):
         finally:
             self.device.remove_listener('advertisement', handler)
             self.scan_queue = asyncio.Queue()
-            await self.device.stop_scanning()
+            await self.device.abort_on('flush', self.device.stop_scanning())
 
     async def Inquiry(self, request, context):
         logging.info('Inquiry')
@@ -379,7 +379,7 @@ class HostService(HostServicer):
             self.device.remove_listener('inquiry_complete', complete_handler)
             self.device.remove_listener('inquiry_result', result_handler)
             self.inquiry_queue = asyncio.Queue()
-            await self.device.stop_discovery()
+            await self.device.abort_on('flush', self.device.stop_discovery())
 
     async def SetDiscoverabilityMode(self, request, context):
         logging.info("SetDiscoverabilityMode")

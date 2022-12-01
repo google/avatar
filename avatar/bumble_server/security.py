@@ -217,39 +217,77 @@ class SecurityService(SecurityServicer):
         level = getattr(request, oneof)
         assert { BT_BR_EDR_TRANSPORT: 'classic', BT_LE_TRANSPORT: 'le' }[connection.transport] == oneof
 
-        fut = asyncio.get_running_loop().create_future()
+        wait_for_security = asyncio.get_running_loop().create_future()
+        authenticate_task = None
+
+        async def authenticate():
+            if (encryption := connection.encryption) != 0:
+                logging.debug('Disable encryption...')
+                try: await connection.encrypt(enable=0x00)
+                except: pass
+                logging.debug('Disable encryption: done')
+
+            logging.debug('Authenticate...')
+            await connection.authenticate()
+            logging.debug('Authenticate: done')
+
+            if encryption != 0 and connection.encryption != encryption:
+                logging.debug('Re-enable encryption...')
+                await connection.encrypt()
+                logging.debug('Re-enable encryption: done')
+
+        def set_failure(name):
+            def wrapper(*args):
+                logging.info(f'Wait for security: error `{name}`: {args}')
+                wait_for_security.set_result(name)
+            return wrapper
 
         def try_set_success(*_):
             if self.reached_security_level(connection, level):
-                fut.set_result('success')
+                logging.info(f'Wait for security: done')
+                wait_for_security.set_result('success')
+
+        def on_encryption_change(*_):
+            if self.reached_security_level(connection, level):
+                logging.info(f'Wait for security: done')
+                wait_for_security.set_result('success')
+            elif connection.transport == BT_BR_EDR_TRANSPORT and self.need_authentication(connection, level):
+                nonlocal authenticate_task
+                if authenticate_task is None:
+                    authenticate_task = asyncio.create_task(authenticate())
 
         listeners = {
-            'disconnection': lambda *_: fut.set_result('connection_died'),
-            'pairing_failure': lambda *_: fut.set_result('pairing_failure'),
-            'connection_authentication_failure': lambda *_: fut.set_result('authentication_failure'),
-            'connection_encryption_failure': lambda *_: fut.set_result('encryption_failure'),
+            'disconnection': set_failure('connection_died'),
+            'pairing_failure': set_failure('pairing_failure'),
+            'connection_authentication_failure': set_failure('authentication_failure'),
+            'connection_encryption_failure': set_failure('encryption_failure'),
             'pairing': try_set_success,
             'connection_authentication': try_set_success,
-            'connection_encryption_change': try_set_success,
+            'connection_encryption_change': on_encryption_change,
         }
 
+        # register event handlers
         for event, listener in listeners.items():
             connection.on(event, listener)
 
-        try:
-            # security level already reached
-            if self.reached_security_level(connection, level):
-                return WaitSecurityResponse(success=Empty())
+        # security level already reached
+        if self.reached_security_level(connection, level):
+            return WaitSecurityResponse(success=Empty())
 
-            logging.info('Wait for security...')
-            kwargs = {}
-            kwargs[await fut] = Empty()
-            logging.info('Wait for security done')
-            return WaitSecurityResponse(**kwargs)
+        logging.info('Wait for security...')
+        kwargs = {}
+        kwargs[await wait_for_security] = Empty()
 
-        finally:
-            for event, listener in listeners.items():
-                connection.remove_listener(event, listener)
+        # remove event handlers
+        for event, listener in listeners.items():
+            connection.remove_listener(event, listener)
+
+        # wait for `authenticate` to finish if any
+        if authenticate_task is not None:
+            try: await authenticate_task
+            except: pass
+
+        return WaitSecurityResponse(**kwargs)
 
     def reached_security_level(self, connection: BumbleConnection, level: int):
         logging.debug(str({

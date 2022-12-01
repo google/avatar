@@ -56,10 +56,12 @@ class ExampleTest(base_test.BaseTestClass):
         self.ref.log.info(f'Address: {ref_address}')
 
     def test_get_remote_name(self):
-        dut_name = self.ref.host.GetRemoteName(address=self.dut.address).name
-        self.ref.log.info(f'DUT remote name: {dut_name}')
-        ref_name = self.dut.host.GetRemoteName(address=self.ref.address).name
-        self.dut.log.info(f'REF remote name: {ref_name}')
+        dut_name = self.ref.host.GetRemoteName(address=self.dut.address)
+        assert_equal(dut_name.WhichOneof('result'), 'name')
+        self.ref.log.info(f'DUT remote name: {dut_name.name}')
+        ref_name = self.dut.host.GetRemoteName(address=self.ref.address)
+        assert_equal(dut_name.WhichOneof('result'), 'name')
+        self.dut.log.info(f'REF remote name: {ref_name.name}')
 
     def test_classic_connect(self):
         dut_address = self.dut.address
@@ -88,6 +90,7 @@ class ExampleTest(base_test.BaseTestClass):
         else:
             scan_response = next((x for x in peers if x.random == Address(self.ref.device.random_address)))
             connection = self.dut.host.ConnectLE(random=scan_response.random, own_address_type=dut_address_type).connection
+        peers.cancel()
         self.dut.host.Disconnect(connection=connection)
 
     def test_not_discoverable(self):
@@ -98,6 +101,8 @@ class ExampleTest(base_test.BaseTestClass):
         except grpc.RpcError as e:
             # No peers found; StartInquiry times out
             assert_equal(e.code(), grpc.StatusCode.DEADLINE_EXCEEDED)
+        finally:
+            peers.cancel()
 
     @avatar.parameterized([
         (DiscoverabilityMode.DISCOVERABLE_LIMITED, ),
@@ -106,7 +111,10 @@ class ExampleTest(base_test.BaseTestClass):
     def test_discoverable(self, mode):
         self.dut.host.SetDiscoverabilityMode(mode=mode)
         peers = self.ref.host.Inquiry(timeout=15.0)
-        assert_is_not_none(next((x for x in peers if x.address == self.dut.address), None))
+        try:
+            assert_is_not_none(next((x for x in peers if x.address == self.dut.address), None))
+        finally:
+            peers.cancel()
 
     @avatar.asynchronous
     async def test_wait_connection(self):
@@ -115,6 +123,7 @@ class ExampleTest(base_test.BaseTestClass):
         dut_ref = await dut_ref
         assert_is_not_none(ref_dut.connection)
         assert_is_not_none(dut_ref.connection)
+        await self.ref.host.Disconnect(connection=ref_dut.connection)
 
     @avatar.asynchronous
     async def test_wait_any_connection(self):
@@ -123,6 +132,7 @@ class ExampleTest(base_test.BaseTestClass):
         dut_ref = await dut_ref
         assert_is_not_none(ref_dut.connection)
         assert_is_not_none(dut_ref.connection)
+        await self.ref.host.Disconnect(connection=ref_dut.connection)
 
     def test_scan_response_data(self):
         self.dut.host.StartAdvertising(
@@ -137,6 +147,8 @@ class ExampleTest(base_test.BaseTestClass):
 
         peers = self.ref.host.Scan()
         scan_response = next((x for x in peers if x.public == self.dut.address))
+        peers.cancel()
+
         assert_equal(type(scan_response.data.complete_local_name), str)
         assert_equal(type(scan_response.data.shortened_local_name), str)
         assert_equal(type(scan_response.data.class_of_device), int)
@@ -199,7 +211,7 @@ class ExampleTest(base_test.BaseTestClass):
         ref_dut = (await self.ref.host.Connect(address=self.dut.address)).connection
         dut_ref = (await self.dut.host.WaitConnection(address=self.ref.address)).connection
 
-        await asyncio.gather(
+        (secure, wait_security) = await asyncio.gather(
             self.ref.security.Secure(connection=ref_dut, classic=SecurityLevel.LEVEL2),
             self.dut.security.WaitSecurity(connection=dut_ref, classic=SecurityLevel.LEVEL2)
         )
@@ -208,19 +220,22 @@ class ExampleTest(base_test.BaseTestClass):
         with suppress(asyncio.CancelledError, futures.CancelledError):
             await pairing
 
+        assert_equal(secure.WhichOneof('result'), 'success')
+        assert_equal(wait_security.WhichOneof('result'), 'success')
+
         await asyncio.gather(
             self.dut.host.Disconnect(connection=dut_ref),
             self.ref.host.WaitDisconnection(connection=ref_dut)
         )
 
     @avatar.parameterized([
-        (OwnAddressType.PUBLIC, OwnAddressType.PUBLIC, PairingDelegate.NO_OUTPUT_NO_INPUT),
-        (OwnAddressType.PUBLIC, OwnAddressType.PUBLIC, PairingDelegate.KEYBOARD_INPUT_ONLY),
-        (OwnAddressType.PUBLIC, OwnAddressType.PUBLIC, PairingDelegate.DISPLAY_OUTPUT_ONLY),
-        (OwnAddressType.PUBLIC, OwnAddressType.PUBLIC, PairingDelegate.DISPLAY_OUTPUT_AND_YES_NO_INPUT),
-        (OwnAddressType.PUBLIC, OwnAddressType.PUBLIC, PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT),
-        (OwnAddressType.PUBLIC, OwnAddressType.RANDOM, PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT),
+        (OwnAddressType.RANDOM, OwnAddressType.RANDOM, PairingDelegate.NO_OUTPUT_NO_INPUT),
+        (OwnAddressType.RANDOM, OwnAddressType.RANDOM, PairingDelegate.KEYBOARD_INPUT_ONLY),
+        (OwnAddressType.RANDOM, OwnAddressType.RANDOM, PairingDelegate.DISPLAY_OUTPUT_ONLY),
+        (OwnAddressType.RANDOM, OwnAddressType.RANDOM, PairingDelegate.DISPLAY_OUTPUT_AND_YES_NO_INPUT),
         (OwnAddressType.RANDOM, OwnAddressType.RANDOM, PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT),
+        (OwnAddressType.PUBLIC, OwnAddressType.RANDOM, PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT),
+        (OwnAddressType.PUBLIC, OwnAddressType.PUBLIC, PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT),
         (OwnAddressType.RANDOM, OwnAddressType.PUBLIC, PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT),
     ])
     @avatar.asynchronous
@@ -238,13 +253,24 @@ class ExampleTest(base_test.BaseTestClass):
             ref_address = {'random': Address(self.ref.device.random_address)}
 
         await self.dut.security_storage.DeleteBond(**ref_address)
-        await self.dut.host.StartAdvertising(legacy=True, connectable=True, own_address_type=dut_address_type)
+        await self.dut.host.StartAdvertising(
+            legacy=True, connectable=True,
+            own_address_type=dut_address_type,
+            data=DataTypes(manufacturer_specific_data=b'pause cafe')
+        )
 
-        dut = await anext(aiter(self.ref.host.Scan(own_address_type=ref_address_type)))
+        dut = None
+        peers = self.ref.host.Scan(own_address_type=ref_address_type)
+        async for peer in aiter(peers):
+            if b'pause cafe' in peer.data.manufacturer_specific_data:
+                dut = peer
+                break
+        assert_is_not_none(dut)
         if dut_address_type in (OwnAddressType.PUBLIC, OwnAddressType.RESOLVABLE_OR_PUBLIC):
             dut_address = {'public': Address(dut.public)}
         else:
             dut_address = {'random': Address(dut.random)}
+        peers.cancel()
 
         async def handle_pairing_events():
             on_ref_pairing = self.ref.security.OnPairing((ref_answer_queue := AsyncQueue()))
@@ -285,10 +311,17 @@ class ExampleTest(base_test.BaseTestClass):
                 on_dut_pairing.cancel()
 
         pairing = asyncio.create_task(handle_pairing_events())
-        ref_dut = (await self.ref.host.ConnectLE(own_address_type=ref_address_type, **dut_address)).connection
-        dut_ref = (await self.dut.host.WaitLEConnection(**ref_address)).connection
+        (dut_ref, ref_dut) = await asyncio.gather(
+            self.dut.host.WaitLEConnection(**ref_address),
+            self.ref.host.ConnectLE(own_address_type=ref_address_type, **dut_address),
+        )
 
-        await asyncio.gather(
+        assert_equal(ref_dut.WhichOneof('result'), 'connection')
+        assert_equal(dut_ref.WhichOneof('result'), 'connection')
+        ref_dut = ref_dut.connection
+        dut_ref = dut_ref.connection
+
+        (secure, wait_security) = await asyncio.gather(
             self.ref.security.Secure(connection=ref_dut, le=LESecurityLevel.LE_LEVEL4),
             self.dut.security.WaitSecurity(connection=dut_ref, le=LESecurityLevel.LE_LEVEL4)
         )
@@ -296,6 +329,9 @@ class ExampleTest(base_test.BaseTestClass):
         pairing.cancel()
         with suppress(asyncio.CancelledError, futures.CancelledError):
             await pairing
+
+        assert_equal(secure.WhichOneof('result'), 'success')
+        assert_equal(wait_security.WhichOneof('result'), 'success')
 
         await asyncio.gather(
             self.dut.host.Disconnect(connection=dut_ref),
