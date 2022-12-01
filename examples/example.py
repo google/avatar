@@ -259,13 +259,8 @@ class ExampleTest(base_test.BaseTestClass):
             data=DataTypes(manufacturer_specific_data=b'pause cafe')
         )
 
-        dut = None
         peers = self.ref.host.Scan(own_address_type=ref_address_type)
-        async for peer in aiter(peers):
-            if b'pause cafe' in peer.data.manufacturer_specific_data:
-                dut = peer
-                break
-        assert_is_not_none(dut)
+        dut = await anext(aiter(peers))
         if dut_address_type in (OwnAddressType.PUBLIC, OwnAddressType.RESOLVABLE_OR_PUBLIC):
             dut_address = {'public': Address(dut.public)}
         else:
