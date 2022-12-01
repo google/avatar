@@ -58,13 +58,12 @@ class HostService(HostServicer):
         self.device = device
         self.scan_queue = asyncio.Queue()
         self.inquiry_queue = asyncio.Queue()
-        self.discoverability_mode = DiscoverabilityMode.NOT_DISCOVERABLE
-        self.connectability_mode = ConnectabilityMode.CONNECTABLE
 
     async def start(self) -> "HostService":
         # According to `host.proto`:
         # At startup, the Host must be in BR/EDR connectable mode
-        await self.device.set_scan_enable(False, True)
+        await self.device.set_discoverable(False)
+        await self.device.set_connectable(True)
         return self
 
     async def FactoryReset(self, request, context):
@@ -367,20 +366,12 @@ class HostService(HostServicer):
 
     async def SetDiscoverabilityMode(self, request, context):
         logging.info("SetDiscoverabilityMode")
-        self.discoverability_mode = request.mode
-        await self.device.set_scan_enable(
-            self.discoverability_mode != DiscoverabilityMode.NOT_DISCOVERABLE,
-            self.connectability_mode != ConnectabilityMode.NOT_CONNECTABLE
-        )
+        await self.device.set_discoverable(request.mode != DiscoverabilityMode.NOT_DISCOVERABLE)
         return Empty()
 
     async def SetConnectabilityMode(self, request, context):
         logging.info("SetConnectabilityMode")
-        self.connectability_mode = request.mode
-        await self.device.set_scan_enable(
-            self.discoverability_mode != DiscoverabilityMode.NOT_DISCOVERABLE,
-            self.connectability_mode != ConnectabilityMode.NOT_CONNECTABLE
-        )
+        await self.device.set_connectable(request.mode != ConnectabilityMode.NOT_CONNECTABLE)
         return Empty()
 
     async def GetRemoteName(self, request, context):
