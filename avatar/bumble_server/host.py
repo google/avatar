@@ -32,6 +32,9 @@ from bumble.hci import (
     HCI_CONNECTION_ALREADY_EXISTS_ERROR,
     Address, HCI_Error
 )
+from bumble.gatt import (
+    Service
+)
 
 from google.protobuf.empty_pb2 import Empty
 from google.protobuf.any_pb2 import Any
@@ -251,8 +254,22 @@ class HostService(HostServicer):
 
         if data := request.data:
             self.device.advertising_data = bytes(self.unpack_data_types(data))
+
+            # Retrieve services data
+            for service in self.device.gatt_server.attributes:
+                if isinstance(service, Service) and (data := service.get_advertising_data()) and (
+                    service.uuid.to_hex_str() in request.data.incomplete_service_class_uuids16 or
+                    service.uuid.to_hex_str() in request.data.complete_service_class_uuids16 or
+                    service.uuid.to_hex_str() in request.data.incomplete_service_class_uuids32 or
+                    service.uuid.to_hex_str() in request.data.complete_service_class_uuids32 or
+                    service.uuid.to_hex_str() in request.data.incomplete_service_class_uuids128 or
+                    service.uuid.to_hex_str() in request.data.complete_service_class_uuids128
+                ):
+                    self.device.advertising_data += data
+
             if scan_response_data := request.scan_response_data:
-                self.device.scan_response_data =  bytes(self.unpack_data_types(scan_response_data))
+                self.device.scan_response_data = bytes(
+                    self.unpack_data_types(scan_response_data))
                 scannable = True
             else:
                 scannable = False
@@ -488,6 +505,8 @@ class HostService(HostServicer):
                 AdvertisingData.LIST_OF_128_BIT_SERVICE_SOLICITATION_UUIDS,
                 bytes([reversed(bytes.fromhex(uuid)) for uuid in data])
             ))
+        # TODO: use `bytes.fromhex(uuid) + (data)` instead of `.extend`.
+        #  we may also need to remove all the `reverse`
         if data := datas.service_data_uuid16:
             res.ad_structures.extend([(
                 AdvertisingData.SERVICE_DATA_16_BIT_UUID,
