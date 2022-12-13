@@ -18,8 +18,6 @@ import logging
 import grpc
 
 from mobly import test_runner, base_test
-from bumble.core import AdvertisingData
-from bumble.hci import UUID
 from bumble.gatt import GATT_ASHA_SERVICE
 
 from avatar.utils import Address
@@ -31,6 +29,8 @@ from pandora.host_pb2 import (
 
 
 class ASHATest(base_test.BaseTestClass):
+    ASHA_UUID = GATT_ASHA_SERVICE.to_hex_str()
+
     def setup_class(self):
         self.pandora_devices = self.register_controller(pandora_device)
         self.dut: pandora_device.PandoraDevice = self.pandora_devices[0]
@@ -46,7 +46,6 @@ class ASHATest(base_test.BaseTestClass):
 
     def test_ASHA_advertising(self):
         complete_local_name = 'Bumble'
-        ASHA_UUID = GATT_ASHA_SERVICE.to_hex_str()
         protocol_version = 0x01
         capability = 0x00
         hisyncid = [0x01, 0x02, 0x03, 0x04, 0x5, 0x6, 0x7, 0x8]
@@ -59,22 +58,52 @@ class ASHATest(base_test.BaseTestClass):
             legacy=True,
             data=DataTypes(
                 complete_local_name=complete_local_name,
-                incomplete_service_class_uuids16=[ASHA_UUID]
+                incomplete_service_class_uuids16=[ASHATest.ASHA_UUID]
             )
         )
         peers = self.dut.host.Scan()
 
-        scan_response = next((x for x in peers if
+        scan_result = next((x for x in peers if
                               x.data.complete_local_name == complete_local_name))
-        logging.info(f"scan_response.data: {scan_response}")
-        assert ASHA_UUID in scan_response.data.service_data_uuid16
-        assert type(scan_response.data.complete_local_name) == str
+        logging.debug(f"scan_response.data: {scan_result}")
+        assert ASHATest.ASHA_UUID in scan_result.data.service_data_uuid16
+        assert type(scan_result.data.complete_local_name) == str
         expected_advertisement_data = "{:02x}".format(protocol_version) + \
                                       "{:02x}".format(capability) + \
                                       "".join([("{:02x}".format(x)) for x in
                                                truncated_hisyncid])
         assert expected_advertisement_data == \
-               (scan_response.data.service_data_uuid16[ASHA_UUID]).hex()
+               (scan_result.data.service_data_uuid16[ASHATest.ASHA_UUID]).hex()
+
+    def test_ASHA_scan_response(self):
+        complete_local_name = 'Bumble'
+        protocol_version = 0x01
+        capability = 0x00
+        hisyncid = [0x01, 0x02, 0x03, 0x04, 0x5, 0x6, 0x7, 0x8]
+        truncated_hisyncid = hisyncid[:4]
+
+        self.ref.asha.Register(capability=capability,
+                               hisyncid=hisyncid)
+
+        self.ref.host.StartAdvertising(
+            legacy=True,
+            scan_response_data=DataTypes(
+                complete_local_name=complete_local_name,
+                incomplete_service_class_uuids16=[ASHATest.ASHA_UUID]
+            ),
+        )
+        peers = self.dut.host.Scan()
+
+        scan_response = next((x for x in peers if
+                              x.data.complete_local_name == complete_local_name))
+        logging.debug(f"scan_response.data: {scan_response}")
+        assert ASHATest.ASHA_UUID in scan_response.data.service_data_uuid16
+        expected_advertisement_data = "{:02x}".format(protocol_version) + \
+                                      "{:02x}".format(capability) + \
+                                      "".join([("{:02x}".format(x)) for x in
+                                               truncated_hisyncid])
+        assert expected_advertisement_data == \
+               (scan_response.data.service_data_uuid16[ASHATest.ASHA_UUID]).hex()
 
 
 if __name__ == '__main__':

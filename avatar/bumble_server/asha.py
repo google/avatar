@@ -31,6 +31,6 @@ class ASHAService(ASHAServicer):
     async def Register(self, request, context):
         logging.info('Register')
         # asha service from bumble profile
-        self.asha_service = AshaService(request.capability, request.hisyncid)
+        self.asha_service = AshaService(request.capability, request.hisyncid, self.device)
         self.device.add_service(self.asha_service)
         return Empty()

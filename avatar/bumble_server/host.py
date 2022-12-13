@@ -255,24 +255,35 @@ class HostService(HostServicer):
         if data := request.data:
             self.device.advertising_data = bytes(self.unpack_data_types(data))
 
-            # Retrieve services data
-            for service in self.device.gatt_server.attributes:
-                if isinstance(service, Service) and (data := service.get_advertising_data()) and (
-                    service.uuid.to_hex_str() in request.data.incomplete_service_class_uuids16 or
-                    service.uuid.to_hex_str() in request.data.complete_service_class_uuids16 or
-                    service.uuid.to_hex_str() in request.data.incomplete_service_class_uuids32 or
-                    service.uuid.to_hex_str() in request.data.complete_service_class_uuids32 or
-                    service.uuid.to_hex_str() in request.data.incomplete_service_class_uuids128 or
-                    service.uuid.to_hex_str() in request.data.complete_service_class_uuids128
-                ):
-                    self.device.advertising_data += data
-
             if scan_response_data := request.scan_response_data:
                 self.device.scan_response_data = bytes(
                     self.unpack_data_types(scan_response_data))
                 scannable = True
             else:
                 scannable = False
+
+            # Retrieve services data
+            for service in self.device.gatt_server.attributes:
+                if isinstance(service, Service) and (data := service.get_advertising_data()):
+                    service_uuid = service.uuid.to_hex_str()
+                    if (
+                        service_uuid in request.data.incomplete_service_class_uuids16 or
+                        service_uuid in request.data.complete_service_class_uuids16 or
+                        service_uuid in request.data.incomplete_service_class_uuids32 or
+                        service_uuid in request.data.complete_service_class_uuids32 or
+                        service_uuid in request.data.incomplete_service_class_uuids128 or
+                        service_uuid in request.data.complete_service_class_uuids128
+                    ):
+                        self.device.advertising_data += data
+                    if (
+                        service_uuid in scan_response_data.incomplete_service_class_uuids16 or
+                        service_uuid in scan_response_data.complete_service_class_uuids16 or
+                        service_uuid in scan_response_data.incomplete_service_class_uuids32 or
+                        service_uuid in scan_response_data.complete_service_class_uuids32 or
+                        service_uuid in scan_response_data.incomplete_service_class_uuids128 or
+                        service_uuid in scan_response_data.complete_service_class_uuids128
+                    ):
+                        self.device.scan_response_data += data
 
             target = None
             if request.connectable and scannable:
