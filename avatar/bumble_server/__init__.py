@@ -76,6 +76,7 @@ class BumblePandoraServer:
         add_ASHAServicer_to_server(ASHAService(self.device), grpc_server)
 
     async def close(self):
+        await self.device.host.flush()
         await self.hci.close()
 
     @classmethod

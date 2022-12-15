@@ -88,6 +88,7 @@ class ExampleTest(base_test.BaseTestClass):
         else:
             scan_response = next((x for x in peers if x.random == Address(self.ref.device.random_address)))
             connection = self.dut.host.ConnectLE(random=scan_response.random, own_address_type=dut_address_type).connection
+        peers.cancel()
         self.dut.host.Disconnect(connection=connection)
 
     def test_not_discoverable(self):
@@ -98,6 +99,8 @@ class ExampleTest(base_test.BaseTestClass):
         except grpc.RpcError as e:
             # No peers found; StartInquiry times out
             assert_equal(e.code(), grpc.StatusCode.DEADLINE_EXCEEDED)
+        finally:
+            peers.cancel()
 
     @avatar.parameterized([
         (DiscoverabilityMode.DISCOVERABLE_LIMITED, ),
@@ -106,7 +109,10 @@ class ExampleTest(base_test.BaseTestClass):
     def test_discoverable(self, mode):
         self.dut.host.SetDiscoverabilityMode(mode=mode)
         peers = self.ref.host.Inquiry(timeout=15.0)
-        assert_is_not_none(next((x for x in peers if x.address == self.dut.address), None))
+        try:
+            assert_is_not_none(next((x for x in peers if x.address == self.dut.address), None))
+        finally:
+            peers.cancel()
 
     @avatar.asynchronous
     async def test_wait_connection(self):
@@ -115,6 +121,7 @@ class ExampleTest(base_test.BaseTestClass):
         dut_ref = await dut_ref
         assert_is_not_none(ref_dut.connection)
         assert_is_not_none(dut_ref.connection)
+        await self.ref.host.Disconnect(connection=ref_dut.connection)
 
     @avatar.asynchronous
     async def test_wait_any_connection(self):
@@ -123,6 +130,7 @@ class ExampleTest(base_test.BaseTestClass):
         dut_ref = await dut_ref
         assert_is_not_none(ref_dut.connection)
         assert_is_not_none(dut_ref.connection)
+        await self.ref.host.Disconnect(connection=ref_dut.connection)
 
     def test_scan_response_data(self):
         self.dut.host.StartAdvertising(
@@ -137,6 +145,8 @@ class ExampleTest(base_test.BaseTestClass):
 
         peers = self.ref.host.Scan()
         scan_response = next((x for x in peers if x.public == self.dut.address))
+        peers.cancel()
+
         assert_equal(type(scan_response.data.complete_local_name), str)
         assert_equal(type(scan_response.data.shortened_local_name), str)
         assert_equal(type(scan_response.data.class_of_device), int)
@@ -240,11 +250,13 @@ class ExampleTest(base_test.BaseTestClass):
         await self.dut.security_storage.DeleteBond(**ref_address)
         await self.dut.host.StartAdvertising(legacy=True, connectable=True, own_address_type=dut_address_type)
 
-        dut = await anext(aiter(self.ref.host.Scan(own_address_type=ref_address_type)))
+        peers = self.ref.host.Scan(own_address_type=ref_address_type)
+        dut = await anext(aiter(peers))
         if dut_address_type in (OwnAddressType.PUBLIC, OwnAddressType.RESOLVABLE_OR_PUBLIC):
             dut_address = {'public': Address(dut.public)}
         else:
             dut_address = {'random': Address(dut.random)}
+        peers.cancel()
 
         async def handle_pairing_events():
             on_ref_pairing = self.ref.security.OnPairing((ref_answer_queue := AsyncQueue()))
