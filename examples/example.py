@@ -56,10 +56,12 @@ class ExampleTest(base_test.BaseTestClass):
         self.ref.log.info(f'Address: {ref_address}')
 
     def test_get_remote_name(self):
-        dut_name = self.ref.host.GetRemoteName(address=self.dut.address).name
-        self.ref.log.info(f'DUT remote name: {dut_name}')
-        ref_name = self.dut.host.GetRemoteName(address=self.ref.address).name
-        self.dut.log.info(f'REF remote name: {ref_name}')
+        dut_name = self.ref.host.GetRemoteName(address=self.dut.address)
+        assert_equal(dut_name.WhichOneof('result'), 'name')
+        self.ref.log.info(f'DUT remote name: {dut_name.name}')
+        ref_name = self.dut.host.GetRemoteName(address=self.ref.address)
+        assert_equal(ref_name.WhichOneof('result'), 'name')
+        self.dut.log.info(f'REF remote name: {ref_name.name}')
 
     def test_classic_connect(self):
         dut_address = self.dut.address
@@ -206,10 +208,17 @@ class ExampleTest(base_test.BaseTestClass):
                 on_dut_pairing.cancel()
 
         pairing = asyncio.create_task(handle_pairing_events())
-        ref_dut = (await self.ref.host.Connect(address=self.dut.address)).connection
-        dut_ref = (await self.dut.host.WaitConnection(address=self.ref.address)).connection
+        (dut_ref, ref_dut) = await asyncio.gather(
+            self.dut.host.WaitConnection(address=self.ref.address),
+            self.ref.host.Connect(address=self.dut.address),
+        )
 
-        await asyncio.gather(
+        assert_equal(ref_dut.WhichOneof('result'), 'connection')
+        assert_equal(dut_ref.WhichOneof('result'), 'connection')
+        ref_dut = ref_dut.connection
+        dut_ref = dut_ref.connection
+
+        (secure, wait_security) = await asyncio.gather(
             self.ref.security.Secure(connection=ref_dut, classic=SecurityLevel.LEVEL2),
             self.dut.security.WaitSecurity(connection=dut_ref, classic=SecurityLevel.LEVEL2)
         )
@@ -217,6 +226,9 @@ class ExampleTest(base_test.BaseTestClass):
         pairing.cancel()
         with suppress(asyncio.CancelledError, futures.CancelledError):
             await pairing
+
+        assert_equal(secure.WhichOneof('result'), 'success')
+        assert_equal(wait_security.WhichOneof('result'), 'success')
 
         await asyncio.gather(
             self.dut.host.Disconnect(connection=dut_ref),
@@ -306,10 +318,17 @@ class ExampleTest(base_test.BaseTestClass):
                 on_dut_pairing.cancel()
 
         pairing = asyncio.create_task(handle_pairing_events())
-        ref_dut = (await self.ref.host.ConnectLE(own_address_type=ref_address_type, **dut_address)).connection
-        dut_ref = (await self.dut.host.WaitLEConnection(**ref_address)).connection
+        (dut_ref, ref_dut) = await asyncio.gather(
+            self.dut.host.WaitLEConnection(**ref_address),
+            self.ref.host.ConnectLE(own_address_type=ref_address_type, **dut_address),
+        )
 
-        await asyncio.gather(
+        assert_equal(ref_dut.WhichOneof('result'), 'connection')
+        assert_equal(dut_ref.WhichOneof('result'), 'connection')
+        ref_dut = ref_dut.connection
+        dut_ref = dut_ref.connection
+
+        (secure, wait_security) = await asyncio.gather(
             self.ref.security.Secure(connection=ref_dut, le=LESecurityLevel.LE_LEVEL4),
             self.dut.security.WaitSecurity(connection=dut_ref, le=LESecurityLevel.LE_LEVEL4)
         )
@@ -317,6 +336,9 @@ class ExampleTest(base_test.BaseTestClass):
         pairing.cancel()
         with suppress(asyncio.CancelledError, futures.CancelledError):
             await pairing
+
+        assert_equal(secure.WhichOneof('result'), 'success')
+        assert_equal(wait_security.WhichOneof('result'), 'success')
 
         await asyncio.gather(
             self.dut.host.Disconnect(connection=dut_ref),
