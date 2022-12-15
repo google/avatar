@@ -224,13 +224,13 @@ class ExampleTest(base_test.BaseTestClass):
         )
 
     @avatar.parameterized([
-        (OwnAddressType.PUBLIC, OwnAddressType.PUBLIC, PairingDelegate.NO_OUTPUT_NO_INPUT),
-        (OwnAddressType.PUBLIC, OwnAddressType.PUBLIC, PairingDelegate.KEYBOARD_INPUT_ONLY),
-        (OwnAddressType.PUBLIC, OwnAddressType.PUBLIC, PairingDelegate.DISPLAY_OUTPUT_ONLY),
-        (OwnAddressType.PUBLIC, OwnAddressType.PUBLIC, PairingDelegate.DISPLAY_OUTPUT_AND_YES_NO_INPUT),
-        (OwnAddressType.PUBLIC, OwnAddressType.PUBLIC, PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT),
-        (OwnAddressType.PUBLIC, OwnAddressType.RANDOM, PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT),
+        (OwnAddressType.RANDOM, OwnAddressType.RANDOM, PairingDelegate.NO_OUTPUT_NO_INPUT),
+        (OwnAddressType.RANDOM, OwnAddressType.RANDOM, PairingDelegate.KEYBOARD_INPUT_ONLY),
+        (OwnAddressType.RANDOM, OwnAddressType.RANDOM, PairingDelegate.DISPLAY_OUTPUT_ONLY),
+        (OwnAddressType.RANDOM, OwnAddressType.RANDOM, PairingDelegate.DISPLAY_OUTPUT_AND_YES_NO_INPUT),
         (OwnAddressType.RANDOM, OwnAddressType.RANDOM, PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT),
+        (OwnAddressType.PUBLIC, OwnAddressType.RANDOM, PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT),
+        (OwnAddressType.PUBLIC, OwnAddressType.PUBLIC, PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT),
         (OwnAddressType.RANDOM, OwnAddressType.PUBLIC, PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT),
     ])
     @avatar.asynchronous
@@ -248,10 +248,19 @@ class ExampleTest(base_test.BaseTestClass):
             ref_address = {'random': Address(self.ref.device.random_address)}
 
         await self.dut.security_storage.DeleteBond(**ref_address)
-        await self.dut.host.StartAdvertising(legacy=True, connectable=True, own_address_type=dut_address_type)
+        await self.dut.host.StartAdvertising(
+            legacy=True, connectable=True,
+            own_address_type=dut_address_type,
+            data=DataTypes(manufacturer_specific_data=b'pause cafe')
+        )
 
+        dut = None
         peers = self.ref.host.Scan(own_address_type=ref_address_type)
-        dut = await anext(aiter(peers))
+        async for peer in aiter(peers):
+            if b'pause cafe' in peer.data.manufacturer_specific_data:
+                dut = peer
+                break
+        assert_is_not_none(dut)
         if dut_address_type in (OwnAddressType.PUBLIC, OwnAddressType.RESOLVABLE_OR_PUBLIC):
             dut_address = {'public': Address(dut.public)}
         else:
