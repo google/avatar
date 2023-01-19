@@ -3,6 +3,7 @@
 TestBeds:
 - Name: ExampleTest
   Controllers:
+    AndroidDevice: '*'
     PandoraDevice:
     - class: AndroidPandoraDevice
       config: '*'
