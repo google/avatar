@@ -28,6 +28,17 @@ from bumble.smp import PairingDelegate
 from bumble.host import Host
 from bumble.device import Device, DeviceConfiguration
 from bumble.transport import open_transport
+from bumble.sdp import (
+    DataElement, ServiceAttribute,
+    SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
+    SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
+    SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+    SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID
+)
+from bumble.core import (
+    BT_GENERIC_AUDIO_SERVICE, BT_HANDSFREE_SERVICE,
+    BT_L2CAP_PROTOCOL_ID, BT_RFCOMM_PROTOCOL_ID
+)
 
 from .host import HostService
 from pandora.host_grpc import add_HostServicer_to_server
@@ -41,6 +52,37 @@ from .asha import ASHAService
 BUMBLE_SERVER_GRPC_PORT = 7999
 ROOTCANAL_PORT_CUTTLEFISH = 7300
 
+def make_sdp_records(rfcomm_channel):
+    return {
+        0x00010001: [
+            ServiceAttribute(SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
+                             DataElement.unsigned_integer_32(0x00010001)),
+            ServiceAttribute(
+                SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
+                DataElement.sequence([
+                    DataElement.uuid(BT_HANDSFREE_SERVICE),
+                    DataElement.uuid(BT_GENERIC_AUDIO_SERVICE)
+                ])),
+            ServiceAttribute(
+                SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+                DataElement.sequence([
+                    DataElement.sequence(
+                        [DataElement.uuid(BT_L2CAP_PROTOCOL_ID)]),
+                    DataElement.sequence([
+                        DataElement.uuid(BT_RFCOMM_PROTOCOL_ID),
+                        DataElement.unsigned_integer_8(rfcomm_channel)
+                    ])
+                ])),
+            ServiceAttribute(
+                SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+                DataElement.sequence([
+                    DataElement.sequence([
+                        DataElement.uuid(BT_HANDSFREE_SERVICE),
+                        DataElement.unsigned_integer_16(0x0105)
+                    ])
+                ]))
+        ]
+    }
 
 class BumblePandoraServer:
 
@@ -63,6 +105,8 @@ class BumblePandoraServer:
 
         # FIXME: add `classic_enabled` to `DeviceConfiguration` ?
         self.device.classic_enabled = self.config.get('classic_enabled', False)
+        # Add fake a2dp service to avoid Android disconnect (TODO: remove when a2dp is supported)
+        self.device.sdp_service_records = make_sdp_records(1)
         io_capability_name = self.config.get('io_capability', 'no_output_no_input').upper()
         io_capability = getattr(PairingDelegate, io_capability_name)
 
