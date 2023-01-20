@@ -21,7 +21,8 @@ from mobly import test_runner, base_test
 from bumble.gatt import GATT_ASHA_SERVICE
 
 from avatar.utils import Address
-from avatar.controllers import pandora_device
+from avatar.pandora_client import PandoraClient
+from avatar.pandora_device_util import PandoraDeviceUtil
 from pandora.host_pb2 import (
     DiscoverabilityMode, DataTypes, OwnAddressType, Connection,
     ConnectabilityMode, OwnAddressType
@@ -32,13 +33,15 @@ class ASHATest(base_test.BaseTestClass):
     ASHA_UUID = GATT_ASHA_SERVICE.to_hex_str()
 
     def setup_class(self):
-        self.pandora_devices = self.register_controller(pandora_device)
-        self.dut: pandora_device.PandoraDevice = self.pandora_devices[0]
-        self.ref: pandora_device.PandoraDevice = self.pandora_devices[1]
+        self.pandora_util = PandoraDeviceUtil(self)
+        self.dut, self.ref = self.pandora_util.get_pandora_devices()
+
+    def teardown_class(self):
+        self.pandora_util.cleanup()
 
     @avatar.asynchronous
     async def setup_test(self):
-        async def reset(device: pandora_device.PandoraDevice):
+        async def reset(device: PandoraClient):
             await device.host.FactoryReset()
             device.address = (await device.host.ReadLocalAddress(wait_for_ready=True)).address
 

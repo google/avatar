@@ -26,7 +26,8 @@ from mobly.asserts import *
 from bumble.smp import PairingDelegate
 
 from avatar.utils import Address, AsyncQueue
-from avatar.controllers import pandora_device
+from avatar.pandora_client import PandoraClient
+from avatar.pandora_device_util import PandoraDeviceUtil
 from pandora.host_pb2 import (
     DiscoverabilityMode, DataTypes, OwnAddressType
 )
@@ -34,16 +35,17 @@ from pandora.security_pb2 import (
     PairingEventAnswer, SecurityLevel, LESecurityLevel
 )
 
-
 class ExampleTest(base_test.BaseTestClass):
     def setup_class(self):
-        self.pandora_devices = self.register_controller(pandora_device)
-        self.dut: pandora_device.PandoraDevice = self.pandora_devices[0]
-        self.ref: pandora_device.BumblePandoraDevice = self.pandora_devices[1]
+        self.pandora_util = PandoraDeviceUtil(self)
+        self.dut, self.ref = self.pandora_util.get_pandora_devices()
+
+    def teardown_class(self):
+        self.pandora_util.cleanup()
 
     @avatar.asynchronous
     async def setup_test(self):
-        async def reset(device: pandora_device.PandoraDevice):
+        async def reset(device: PandoraClient):
             await device.host.FactoryReset()
             device.address = (await device.host.ReadLocalAddress(wait_for_ready=True)).address
 
