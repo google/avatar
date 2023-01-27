@@ -22,8 +22,22 @@ __version__ = "0.0.1"
 
 import asyncio
 import functools
+import threading
 
-from threading import Thread
+
+class AsyncQueue(asyncio.Queue):
+
+    def __aiter__(self):
+        return self
+
+    def __iter__(self):
+        return self
+
+    async def __anext__(self):
+        return await self.get()
+
+    def __next__(self):
+        return run_until_complete(self.__anext__())
 
 
 # Keep running an event loop is a separate thread,
@@ -36,7 +50,7 @@ def thread_loop():
     loop.run_forever()
     loop.run_until_complete(loop.shutdown_asyncgens())
 
-thread = Thread(target=thread_loop, daemon=True)
+thread = threading.Thread(target=thread_loop, daemon=True)
 thread.start()
 
 

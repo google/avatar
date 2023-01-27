@@ -20,7 +20,6 @@ import grpc
 from mobly import test_runner, base_test
 from bumble.gatt import GATT_ASHA_SERVICE
 
-from avatar.utils import Address
 from avatar.pandora_client import PandoraClient
 from avatar.pandora_device_util import PandoraDeviceUtil
 from pandora.host_pb2 import (

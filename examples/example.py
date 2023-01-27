@@ -25,8 +25,8 @@ from mobly.asserts import *
 
 from bumble.smp import PairingDelegate
 
-from avatar.utils import Address, AsyncQueue
-from avatar.pandora_client import BumblePandoraClient, PandoraClient
+from avatar import AsyncQueue
+from avatar.pandora_client import Address, BumblePandoraClient, PandoraClient
 from avatar.pandora_device_util import PandoraDeviceUtil
 from pandora.host_pb2 import (
     DiscoverabilityMode, DataTypes, OwnAddressType

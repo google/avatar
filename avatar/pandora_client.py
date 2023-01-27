@@ -24,7 +24,6 @@ import logging
 
 from typing import Any, MutableMapping, Optional, Tuple, Union
 
-from avatar import utils
 from avatar.bumble_device import BumbleDevice
 
 from bumble.hci import Address as BumbleAddress
@@ -32,6 +31,27 @@ from bumble.hci import Address as BumbleAddress
 from pandora.host_grpc import Host
 from pandora.security_grpc import Security, SecurityStorage
 from pandora.asha_grpc import ASHA
+
+
+class Address(bytes):
+
+    def __new__(cls, address):
+        if type(address) is bytes:
+            address_bytes = address
+        elif type(address) is str:
+            address_bytes = bytes.fromhex(address.replace(':', ''))
+        elif isinstance(address, BumbleAddress):
+            address_bytes = bytes(reversed(bytes(address)))
+        else:
+            raise ValueError('Invalid address format')
+
+        if len(address_bytes) != 6:
+            raise ValueError('Invalid address length')
+
+        return bytes.__new__(cls, address_bytes)
+
+    def __str__(self):
+        return ':'.join([f'{x:02X}' for x in self])
 
 
 class PandoraClient:
@@ -42,7 +62,7 @@ class PandoraClient:
     log: 'PandoraClientLoggerAdapter'  # Logger adapter.
 
     # private fields
-    _address: utils.Address  # Bluetooth device address
+    _address: Address  # Bluetooth device address
     _channel: grpc.Channel  # Synchronous gRPC channel.
     _aio_channel: Optional[grpc.aio.Channel]  # Asynchronous gRPC channel.
 
@@ -56,7 +76,7 @@ class PandoraClient:
         """
         self.grpc_target = grpc_target
         self.log = PandoraClientLoggerAdapter(logging.getLogger(), {'obj': self})
-        self._address = utils.Address(b'\x00\x00\x00\x00\x00\x00')
+        self._address = Address(b'\x00\x00\x00\x00\x00\x00')
         self._channel = grpc.insecure_channel(grpc_target)
         self._aio_channel = None
 
@@ -78,14 +98,14 @@ class PandoraClient:
         return self._channel
 
     @property
-    def address(self) -> utils.Address:
+    def address(self) -> Address:
         """Returns the BD address."""
         return self._address
 
     @address.setter
     def address(self, address: Union[bytes, str, BumbleAddress]) -> None:
         """Sets the BD address."""
-        self._address = utils.Address(address)
+        self._address = Address(address)
 
     # Pandora interfaces
 
@@ -137,5 +157,5 @@ class BumblePandoraClient(PandoraClient):
         return self._bumble.device
 
     @property
-    def random_address(self) -> utils.Address:
-        return utils.Address(self.device.random_address)
+    def random_address(self) -> Address:
+        return Address(self.device.random_address)
