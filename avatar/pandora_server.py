@@ -18,16 +18,24 @@
 import asyncio
 import avatar
 import grpc
+import threading
+import time
 import types
 
 from contextlib import suppress
 
 from typing import NoReturn, Optional, TypeVar, Generic
 
+from mobly.controllers import android_device
+from mobly.controllers.android_device import AndroidDevice
+
 from avatar.bumble_device import BumbleDevice
 from avatar.bumble_server import serve_bumble
 from avatar.pandora_client import PandoraClient, BumblePandoraClient
 from avatar.controllers import bumble_device
+
+ANDROID_SERVER_PACKAGE = 'com.android.pandora'
+ANDROID_SERVER_GRPC_PORT = 8999 # TODO: Use a dynamic port
 
 
 # Generic type for `PandoraServer`.
@@ -91,3 +99,50 @@ class BumblePandoraServer(PandoraServer[BumbleDevice]):
             with suppress(asyncio.CancelledError): await self._task
 
         avatar.run_until_complete(server_stop())
+
+
+class AndroidPandoraServer(PandoraServer[AndroidDevice]):
+    """Manages the Pandora gRPC server on an AndroidDevice."""
+
+    MOBLY_CONTROLLER_MODULE = android_device
+
+    _instrumentation: Optional[threading.Thread] = None
+    _port: int = ANDROID_SERVER_GRPC_PORT
+
+    def start(self) -> PandoraClient:
+        """Sets up and starts the Pandora server on the Android device."""
+        assert self._instrumentation is None
+
+        # start Pandora Android gRPC server.
+        self._instrumentation = threading.Thread(
+            target=lambda: self.device.adb._exec_adb_cmd(
+                'shell',
+                f'am instrument --no-hidden-api-checks -w {ANDROID_SERVER_PACKAGE}/.Main',
+                shell=False,
+                timeout=None,
+                stderr=None
+            )
+        )
+
+        self._instrumentation.start()
+        self.device.adb.forward([f'tcp:{self._port}', f'tcp:{ANDROID_SERVER_GRPC_PORT}'])
+
+        # wait a few seconds for the Android gRPC server to be started.
+        time.sleep(3)
+
+        return PandoraClient(f'localhost:{self._port}')
+
+    def stop(self) -> None:
+        """Stops and cleans up the Pandora server on the Android device."""
+        assert self._instrumentation is not None
+
+        # Stop Pandora Android gRPC server.
+        self.device.adb._exec_adb_cmd(
+            'shell',
+            f'am force-stop {ANDROID_SERVER_PACKAGE}',
+            shell=False,
+            timeout=None,
+            stderr=None)
+
+        self.device.adb.forward(['--remove', f'tcp:{ANDROID_SERVER_GRPC_PORT}'])
+        self._instrumentation.join()
