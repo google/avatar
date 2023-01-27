@@ -19,21 +19,17 @@ any Bluetooth test cases virtually and physically.
 
 __version__ = "0.0.1"
 
-import asyncio
 import functools
 import importlib
 import logging
-import threading
-
-from typing import Any, Iterable, Iterator, List, Sized
-
-from mobly import base_test
 
 from avatar import pandora_server
 from avatar.pandora_client import PandoraClient
 from avatar.pandora_server import PandoraServer
+from mobly import base_test
+from typing import Any, Callable, Dict, Iterable, Iterator, List, Sized, Tuple, Type
 
-PANDORA_COMMON_SERVER_CLASSES = {
+PANDORA_COMMON_SERVER_CLASSES: Dict[str, Type[pandora_server.PandoraServer[Any]]] = {
     'PandoraDevice': pandora_server.PandoraServer,
     'AndroidDevice': pandora_server.AndroidPandoraServer,
     'BumbleDevice': pandora_server.BumblePandoraServer,
@@ -68,22 +64,17 @@ class PandoraDevices(Sized, Iterable[PandoraClient]):
         self._clients = []
         self._servers = []
 
-        user_params = test.user_params
-        controller_configs = test.controller_configs.copy()
+        user_params: Dict[str, Any] = test.user_params  # type: ignore
+        controller_configs: Dict[str, Any] = test.controller_configs.copy()  # type: ignore
         sorted_controllers = sorted(
-            controller_configs.keys(),
-            key=lambda controller: user_params.get(f'order_{controller}', 100),
+            controller_configs.keys(), key=lambda controller: user_params.get(f'order_{controller}', 100)
         )
         for controller in sorted_controllers:
             # Find the corresponding PandoraServer class for the controller.
             if f'{KEY_PANDORA_SERVER_CLASS}_{controller}' in user_params:
                 # Try to load the server dynamically if module specified in user_params.
                 class_path = user_params[f'{KEY_PANDORA_SERVER_CLASS}_{controller}']
-                logging.info(
-                    'Loading Pandora server class %s from config for %s.',
-                    class_path,
-                    controller,
-                )
+                logging.info('Loading Pandora server class %s from config for %s.', class_path, controller)
                 server_cls = _load_pandora_server_class(class_path)
             else:
                 # Search in the list of commonly-used controllers.
@@ -97,8 +88,9 @@ class PandoraDevices(Sized, Iterable[PandoraClient]):
 
             # Register the controller and load its Pandora servers.
             logging.info('Starting %s(s) for %s', server_cls.__name__, controller)
-            devices = test.register_controller(server_cls.MOBLY_CONTROLLER_MODULE)
-            for device in devices:
+            devices: Optional[List[Any]] = test.register_controller(server_cls.MOBLY_CONTROLLER_MODULE)  # type: ignore
+            assert devices
+            for device in devices:  # type: ignore
                 self._servers.append(server_cls(device))
 
         self.start_all()
@@ -127,7 +119,7 @@ class PandoraDevices(Sized, Iterable[PandoraClient]):
         self._clients.clear()
 
 
-def _load_pandora_server_class(class_path: str) -> pandora_server.PandoraServer:
+def _load_pandora_server_class(class_path: str) -> Type[pandora_server.PandoraServer[Any]]:
     """Dynamically load a PandoraServer from a user-specified module+class.
 
     Args:
@@ -144,70 +136,28 @@ def _load_pandora_server_class(class_path: str) -> pandora_server.PandoraServer:
     server_class = getattr(module, class_name)
     # Check that the class is a subclass of PandoraServer
     if not issubclass(server_class, pandora_server.PandoraServer):
-        raise TypeError(
-            f'The specified class {class_path} is not a subclass of PandoraServer.'
-        )
-    return server_class
+        raise TypeError(f'The specified class {class_path} is not a subclass of PandoraServer.')
+    return server_class  # type: ignore
 
 
-class AsyncQueue(asyncio.Queue):
+class Wrapper(object):
+    func: Callable[..., Any]
 
-    def __aiter__(self):
-        return self
-
-    def __iter__(self):
-        return self
-
-    async def __anext__(self):
-        return await self.get()
-
-    def __next__(self):
-        return run_until_complete(self.__anext__())
-
-
-# Keep running an event loop is a separate thread,
-# which is then used to:
-#   * Schedule Bumble(s) IO & gRPC server.
-#   * Schedule asynchronous tests.
-loop = asyncio.new_event_loop()
-
-def thread_loop():
-    loop.run_forever()
-    loop.run_until_complete(loop.shutdown_asyncgens())
-
-thread = threading.Thread(target=thread_loop, daemon=True)
-thread.start()
-
-
-# run coroutine into our loop until complete
-def run_until_complete(coro):
-    return asyncio.run_coroutine_threadsafe(coro, loop).result()
-
-
-# Convert an asynchronous function to a synchronous one by
-# executing it's code within our loop
-def asynchronous(func):
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        return run_until_complete(func(*args, **kwargs))
-    return wrapper
+    def __init__(self, func: Callable[..., Any]) -> None:
+        self.func = func
 
 
 # Multiply the same function from `inputs` parameters
-def parameterized(inputs):
-    class wrapper(object):
-        def __init__(self, func):
-            self.func = func
-
-        def __set_name__(self, owner, name):
+def parameterized(*inputs: Tuple[Any, ...]) -> Type[Wrapper]:
+    class wrapper(Wrapper):
+        def __set_name__(self, owner: str, name: str) -> None:
             for input in inputs:
-                if type(input) != tuple:
-                    raise ValueError(f'input type {type(input)} shall be a tuple')
 
-                def decorate(input):
+                def decorate(input: Tuple[Any, ...]) -> Callable[..., Any]:
                     @functools.wraps(self.func)
-                    def wrapper(*args, **kwargs):
+                    def wrapper(*args: Any, **kwargs: Any) -> Any:
                         return self.func(*args, *input, **kwargs)
+
                     return wrapper
 
                 # we need to pass `input` here, otherwise it will be set to the value

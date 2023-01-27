@@ -8,8 +8,60 @@ dependencies = [
     "bumble",
     "grpcio>=1.41",
     "mobly>=1.12",
-    "bitstruct>=8.12"
+    "bitstruct>=8.12",
 ]
+
+[project.optional-dependencies]
+dev = [
+    "black>=22.12.0",
+    "pyright>=1.1.292",
+    "mypy>=0.991",
+    "isort>=5.12.0",
+    "types-psutil>=5.9.5.6",
+    "types-setuptools>=65.7.0.3",
+    "types-protobuf>=4.21.0.3"
+]
+
+[tool.black]
+line-length = 119
+target-version = ["py38", "py39", "py310", "py311"]
+skip-string-normalization = true
+
+[tool.isort]
+profile = "black"
+line_length = 119
+no_sections = true
+lines_between_types = 1
+combine_as_imports = true
+
+[tool.mypy]
+strict = true
+warn_unused_ignores = false
+files = ["avatar", "examples"]
+mypy_path = '$MYPY_CONFIG_FILE_DIR/bt-test-interfaces/python:$MYPY_CONFIG_FILE_DIR/third-party/bumble'
+exclude = 'third-party/bumble'
+
+[[tool.mypy.overrides]]
+module = "grpc.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mobly.*"
+ignore_missing_imports = true
+
+[tool.pyright]
+include = ["avatar", "examples"]
+exclude = ["**/__pycache__"]
+venvPath = "."
+venv = ".venv"
+typeCheckingMode = "strict"
+useLibraryCodeForTypes = true
+verboseOutput = false
+extraPaths = [
+    'bt-test-interfaces/python',
+    'third-party/bumble'
+]
+reportMissingTypeStubs = false
 
 [build-system]
 requires = ["flit_core==3.7.1"]

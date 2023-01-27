@@ -15,27 +15,22 @@
 
 """Pandora client interface for Avatar tests."""
 
-import asyncio
-import avatar
+import avatar.aio
 import bumble
-import contextlib
+import bumble.device
 import grpc
+import grpc.aio
 import logging
 
-from typing import Any, MutableMapping, Optional, Tuple, Union
-
 from avatar.bumble_device import BumbleDevice
-
 from bumble.hci import Address as BumbleAddress
-
-from pandora.host_grpc import Host
-from pandora.security_grpc import Security, SecurityStorage
-from pandora.asha_grpc import ASHA
+from dataclasses import dataclass
+from pandora import asha_grpc, asha_grpc_aio, host_grpc, host_grpc_aio, security_grpc, security_grpc_aio
+from typing import Any, MutableMapping, Optional, Tuple, Union
 
 
 class Address(bytes):
-
-    def __new__(cls, address):
+    def __new__(cls, address: Union[bytes, str, BumbleAddress]) -> 'Address':
         if type(address) is bytes:
             address_bytes = address
         elif type(address) is str:
@@ -50,7 +45,7 @@ class Address(bytes):
 
         return bytes.__new__(cls, address_bytes)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return ':'.join([f'{x:02X}' for x in self])
 
 
@@ -60,11 +55,11 @@ class PandoraClient:
     # public fields
     grpc_target: str  # Server address for the gRPC channel.
     log: 'PandoraClientLoggerAdapter'  # Logger adapter.
+    channel: grpc.Channel  # Synchronous gRPC channel.
 
     # private fields
     _address: Address  # Bluetooth device address
-    _channel: grpc.Channel  # Synchronous gRPC channel.
-    _aio_channel: Optional[grpc.aio.Channel]  # Asynchronous gRPC channel.
+    _aio: Optional['PandoraClient.Aio']  # Asynchronous gRPC channel.
 
     def __init__(self, grpc_target: str) -> None:
         """Creates a PandoraClient.
@@ -76,26 +71,15 @@ class PandoraClient:
         """
         self.grpc_target = grpc_target
         self.log = PandoraClientLoggerAdapter(logging.getLogger(), {'obj': self})
+        self.channel = grpc.insecure_channel(grpc_target)  # type: ignore
         self._address = Address(b'\x00\x00\x00\x00\x00\x00')
-        self._channel = grpc.insecure_channel(grpc_target)
-        self._aio_channel = None
+        self._aio = None
 
     def close(self) -> None:
         """Closes the gRPC channels."""
-        self._channel.close()
-        if self._aio_channel:
-            avatar.run_until_complete(self._aio_channel.close())
-
-    @property
-    def channel(self) -> Union[grpc.Channel, grpc.aio.Channel]:
-        """Returns the active gRPC channel."""
-        # Force the use of the asynchronous channel when running in our event loop.
-        with contextlib.suppress(RuntimeError):
-            if asyncio.get_running_loop() == avatar.loop:
-                if not self._aio_channel:
-                    self._aio_channel = grpc.aio.insecure_channel(self.grpc_target)
-                return self._aio_channel
-        return self._channel
+        self.channel.close()
+        if self._aio:
+            avatar.aio.run_until_complete(self._aio.channel.close())
 
     @property
     def address(self) -> Address:
@@ -110,32 +94,60 @@ class PandoraClient:
     # Pandora interfaces
 
     @property
-    def host(self) -> Host:
+    def host(self) -> host_grpc.Host:
         """Returns the Pandora Host gRPC interface."""
-        return Host(self.channel)
+        return host_grpc.Host(self.channel)
 
     @property
-    def security(self) -> Security:
+    def security(self) -> security_grpc.Security:
         """Returns the Pandora Security gRPC interface."""
-        return Security(self.channel)
+        return security_grpc.Security(self.channel)
 
     @property
-    def security_storage(self) -> SecurityStorage:
+    def security_storage(self) -> security_grpc.SecurityStorage:
         """Returns the Pandora SecurityStorage gRPC interface."""
-        return SecurityStorage(self.channel)
+        return security_grpc.SecurityStorage(self.channel)
 
     @property
-    def asha(self) -> ASHA:
+    def asha(self) -> asha_grpc.ASHA:
         """Returns the Pandora ASHA gRPC interface."""
-        return ASHA(self.channel)
+        return asha_grpc.ASHA(self.channel)
+
+    @dataclass
+    class Aio:
+        channel: grpc.aio.Channel
+
+        @property
+        def host(self) -> host_grpc_aio.Host:
+            """Returns the Pandora Host gRPC interface."""
+            return host_grpc_aio.Host(self.channel)
+
+        @property
+        def security(self) -> security_grpc_aio.Security:
+            """Returns the Pandora Security gRPC interface."""
+            return security_grpc_aio.Security(self.channel)
+
+        @property
+        def security_storage(self) -> security_grpc_aio.SecurityStorage:
+            """Returns the Pandora SecurityStorage gRPC interface."""
+            return security_grpc_aio.SecurityStorage(self.channel)
+
+        @property
+        def asha(self) -> asha_grpc_aio.ASHA:
+            """Returns the Pandora ASHA gRPC interface."""
+            return asha_grpc_aio.ASHA(self.channel)
+
+    @property
+    def aio(self) -> 'PandoraClient.Aio':
+        if not self._aio:
+            self._aio = PandoraClient.Aio(grpc.aio.insecure_channel(self.grpc_target))
+        return self._aio
 
 
-class PandoraClientLoggerAdapter(logging.LoggerAdapter):
+class PandoraClientLoggerAdapter(logging.LoggerAdapter):  # type: ignore
     """Formats logs from the PandoraClient."""
 
-    def process(
-        self, msg: str, kwargs: MutableMapping[str, Any]
-    ) -> Tuple[str, MutableMapping[str, Any]]:
+    def process(self, msg: str, kwargs: MutableMapping[str, Any]) -> Tuple[str, MutableMapping[str, Any]]:
         assert self.extra
         obj = self.extra['obj']
         assert isinstance(obj, PandoraClient)

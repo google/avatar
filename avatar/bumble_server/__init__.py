@@ -18,36 +18,30 @@ __version__ = "0.0.1"
 
 import asyncio
 import grpc
+import grpc.aio
 import logging
 import os
 import sys
 import traceback
 
-from typing import NoReturn, Optional
-
-from bumble.smp import PairingDelegate
-
-from pandora.host_grpc import add_HostServicer_to_server
-from pandora.security_grpc import add_SecurityServicer_to_server, add_SecurityStorageServicer_to_server
-from pandora.asha_grpc import add_ASHAServicer_to_server
-
 from avatar.bumble_device import BumbleDevice
+from avatar.bumble_server.asha import ASHAService
 from avatar.bumble_server.host import HostService
 from avatar.bumble_server.security import SecurityService, SecurityStorageService
-from avatar.bumble_server.asha import ASHAService
+from bumble.smp import PairingDelegate
+from pandora.asha_grpc_aio import add_ASHAServicer_to_server
+from pandora.host_grpc_aio import add_HostServicer_to_server
+from pandora.security_grpc_aio import add_SecurityServicer_to_server, add_SecurityStorageServicer_to_server
+from typing import NoReturn, Optional
 
 
-async def serve_bumble(
-    bumble: BumbleDevice,
-    server: Optional[grpc.aio.Server] = None,
-    port: int = 0,
-) -> NoReturn:
+async def serve_bumble(bumble: BumbleDevice, grpc_server: Optional[grpc.aio.Server] = None, port: int = 0) -> NoReturn:
     # load IO capability from config.
-    io_capability_name = bumble.config.get('io_capability', 'no_output_no_input').upper()
-    io_capability = getattr(PairingDelegate, io_capability_name)
+    io_capability_name: str = bumble.config.get('io_capability', 'no_output_no_input').upper()
+    io_capability: int = getattr(PairingDelegate, io_capability_name)
 
-    if server is None:
-        server = grpc.aio.server()
+    # initialize a gRPC server if not provided.
+    server: grpc.aio.Server = grpc_server if grpc_server is not None else grpc.aio.server()
 
     try:
         while True:
@@ -62,7 +56,7 @@ async def serve_bumble(
                 await bumble.open()
             except:
                 print(traceback.format_exc(), end='', file=sys.stderr)
-                os._exit(1)
+                os._exit(1)  # type: ignore
 
             try:
                 # Pandora require classic devices to to be discoverable & connectable.
@@ -90,10 +84,7 @@ BUMBLE_SERVER_GRPC_PORT = 7999
 ROOTCANAL_PORT_CUTTLEFISH = 7300
 
 if __name__ == '__main__':
-    bumble = BumbleDevice({
-        'transport': f'tcp-client:127.0.0.1:{ROOTCANAL_PORT_CUTTLEFISH}',
-        'classic_enabled': True
-    })
+    bumble = BumbleDevice({'transport': f'tcp-client:127.0.0.1:{ROOTCANAL_PORT_CUTTLEFISH}', 'classic_enabled': True})
 
     logging.basicConfig(level=logging.DEBUG)
     asyncio.run(serve_bumble(bumble, port=BUMBLE_SERVER_GRPC_PORT))

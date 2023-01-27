@@ -12,25 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import grpc
 import logging
 
 from bumble.device import Device
 from bumble.profiles.asha_service import AshaService
-
-from pandora.asha_grpc import ASHAServicer
-
 from google.protobuf.empty_pb2 import Empty
+from pandora.asha_grpc import RegisterRequest
+from pandora.asha_grpc_aio import ASHAServicer
+from typing import Optional
 
 
 class ASHAService(ASHAServicer):
-    def __init__(self, device: Device):
+    device: Device
+    asha_service: Optional[AshaService]
+
+    def __init__(self, device: Device) -> None:
         self.device = device
+        self.asha_service = None
 
-        super().__init__()
-
-    async def Register(self, request, context):
+    async def Register(self, request: RegisterRequest, context: grpc.ServicerContext) -> Empty:
         logging.info('Register')
         # asha service from bumble profile
         self.asha_service = AshaService(request.capability, request.hisyncid, self.device)
-        self.device.add_service(self.asha_service)
+        self.device.add_service(self.asha_service)  # type: ignore[no-untyped-call]
         return Empty()

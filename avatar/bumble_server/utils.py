@@ -13,14 +13,18 @@
 # limitations under the License.
 
 from bumble.hci import Address
+from google.protobuf.message import Message
+from typing import Optional
 
-
-ADDRESS_TYPES = {
+ADDRESS_TYPES: dict[str, int] = {
     "public": Address.PUBLIC_DEVICE_ADDRESS,
     "random": Address.RANDOM_DEVICE_ADDRESS,
     "public_identity": Address.PUBLIC_IDENTITY_ADDRESS,
-    "random_static_identity": Address.RANDOM_IDENTITY_ADDRESS
+    "random_static_identity": Address.RANDOM_IDENTITY_ADDRESS,
 }
 
-def address_from_request(request, field):
+
+def address_from_request(request: Message, field: Optional[str]) -> Address:
+    if field is None:
+        return Address.ANY
     return Address(bytes(reversed(getattr(request, field))), ADDRESS_TYPES[field])

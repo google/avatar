@@ -39,3 +39,15 @@ root-canal
 ```
 python examples/example.py -c examples/simulated_bumble_bumble.yml --verbose
 ```
+
+3. Lint with `pyright` and `mypy`
+```
+pyright
+mypy
+```
+
+3. Format & imports style
+```
+black avatar/ examples/
+isort avatar/ examples/
+```

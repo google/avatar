@@ -16,30 +16,29 @@
 """Interface for controller-specific Pandora server management."""
 
 import asyncio
-import avatar
+import avatar.aio
 import grpc
+import grpc.aio
 import threading
 import time
 import types
 
-from contextlib import suppress
-
-from typing import NoReturn, Optional, TypeVar, Generic
-
-from mobly.controllers import android_device
-from mobly.controllers.android_device import AndroidDevice
-
 from avatar.bumble_device import BumbleDevice
 from avatar.bumble_server import serve_bumble
-from avatar.pandora_client import PandoraClient, BumblePandoraClient
-from avatar.controllers import pandora_device, bumble_device
+from avatar.controllers import bumble_device, pandora_device
+from avatar.pandora_client import BumblePandoraClient, PandoraClient
+from contextlib import suppress
+from mobly.controllers import android_device
+from mobly.controllers.android_device import AndroidDevice
+from typing import Generic, NoReturn, Optional, TypeVar
 
 ANDROID_SERVER_PACKAGE = 'com.android.pandora'
-ANDROID_SERVER_GRPC_PORT = 8999 # TODO: Use a dynamic port
+ANDROID_SERVER_GRPC_PORT = 8999  # TODO: Use a dynamic port
 
 
 # Generic type for `PandoraServer`.
 TDevice = TypeVar('TDevice')
+
 
 class PandoraServer(Generic[TDevice]):
     """Abstract interface to manage the Pandora gRPC server on the device."""
@@ -77,28 +76,26 @@ class BumblePandoraServer(PandoraServer[BumbleDevice]):
         assert self._task is None
 
         # set the event loop to make sure the gRPC server use the avatar one.
-        asyncio.set_event_loop(avatar.loop)
+        asyncio.set_event_loop(avatar.aio.loop)
 
         # create gRPC server & port.
         server = grpc.aio.server()
         port = server.add_insecure_port(f'localhost:{0}')
 
-        self._task = avatar.loop.create_task(serve_bumble(
-            self.device,
-            server=server,
-            port=port,
-        ))
+        self._task = avatar.aio.loop.create_task(serve_bumble(self.device, grpc_server=server, port=port))
 
         return BumblePandoraClient(f'localhost:{port}', self.device)
 
     def stop(self) -> None:
         """Stops and cleans up the Pandora server on the Bumble device."""
+
         async def server_stop() -> None:
             assert self._task is not None
             self._task.cancel()
-            with suppress(asyncio.CancelledError): await self._task
+            with suppress(asyncio.CancelledError):
+                await self._task
 
-        avatar.run_until_complete(server_stop())
+        avatar.aio.run_until_complete(server_stop())
 
 
 class AndroidPandoraServer(PandoraServer[AndroidDevice]):
@@ -115,17 +112,17 @@ class AndroidPandoraServer(PandoraServer[AndroidDevice]):
 
         # start Pandora Android gRPC server.
         self._instrumentation = threading.Thread(
-            target=lambda: self.device.adb._exec_adb_cmd(
+            target=lambda: self.device.adb._exec_adb_cmd(  # type: ignore
                 'shell',
                 f'am instrument --no-hidden-api-checks -w {ANDROID_SERVER_PACKAGE}/.Main',
                 shell=False,
                 timeout=None,
-                stderr=None
+                stderr=None,
             )
         )
 
         self._instrumentation.start()
-        self.device.adb.forward([f'tcp:{self._port}', f'tcp:{ANDROID_SERVER_GRPC_PORT}'])
+        self.device.adb.forward([f'tcp:{self._port}', f'tcp:{ANDROID_SERVER_GRPC_PORT}'])  # type: ignore
 
         # wait a few seconds for the Android gRPC server to be started.
         time.sleep(3)
@@ -137,12 +134,9 @@ class AndroidPandoraServer(PandoraServer[AndroidDevice]):
         assert self._instrumentation is not None
 
         # Stop Pandora Android gRPC server.
-        self.device.adb._exec_adb_cmd(
-            'shell',
-            f'am force-stop {ANDROID_SERVER_PACKAGE}',
-            shell=False,
-            timeout=None,
-            stderr=None)
+        self.device.adb._exec_adb_cmd(  # type: ignore
+            'shell', f'am force-stop {ANDROID_SERVER_PACKAGE}', shell=False, timeout=None, stderr=None
+        )
 
-        self.device.adb.forward(['--remove', f'tcp:{ANDROID_SERVER_GRPC_PORT}'])
+        self.device.adb.forward(['--remove', f'tcp:{ANDROID_SERVER_GRPC_PORT}'])  # type: ignore
         self._instrumentation.join()

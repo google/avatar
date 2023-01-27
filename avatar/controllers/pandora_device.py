@@ -12,28 +12,31 @@
 
 import importlib
 
-from typing import Any, Dict, List, Optional
-
-from ..pandora_client import PandoraClient
+from avatar.pandora_client import PandoraClient
+from typing import Any, Dict, List, Optional, cast
 
 MOBLY_CONTROLLER_CONFIG_NAME = 'PandoraDevice'
 
 
 def create(configs: List[Dict[str, Any]]) -> List[PandoraClient]:
     """Create a list of `PandoraClient` from configs."""
-    def create_device(config):
+
+    def create_device(config: Dict[str, Any]) -> PandoraClient:
         module_name = config.pop('module', PandoraClient.__module__)
         class_name = config.pop('class', PandoraClient.__name__)
 
         module = importlib.import_module(module_name)
-        return getattr(module, class_name)(**config)
+        return cast(PandoraClient, getattr(module, class_name)(**config))
 
     return list(map(create_device, configs))
 
+
 def destroy(devices: List['PandoraClient']) -> None:
     """Destroy each `PandoraClient`"""
-    for device in devices: device.close()
+    for device in devices:
+        device.close()
+
 
 def get_info(devices: List['PandoraClient']) -> List[Optional[Dict[str, Any]]]:
     """Return the device info for each `PandoraClient`."""
-    return [{ 'grpc_target': device.grpc_target, 'bd_addr': str(device.address) } for device in devices]
+    return [{'grpc_target': device.grpc_target, 'bd_addr': str(device.address)} for device in devices]

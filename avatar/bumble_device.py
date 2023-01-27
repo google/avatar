@@ -14,22 +14,19 @@
 
 """Generic & dependency free Bumble (reference) device."""
 
-from typing import Any, Dict, List, Optional
-
+from bumble import transport
+from bumble.core import BT_GENERIC_AUDIO_SERVICE, BT_HANDSFREE_SERVICE, BT_L2CAP_PROTOCOL_ID, BT_RFCOMM_PROTOCOL_ID
 from bumble.device import Device, DeviceConfiguration
 from bumble.host import Host
-from bumble import transport
 from bumble.sdp import (
-    DataElement, ServiceAttribute,
-    SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
-    SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
+    SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
     SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-    SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID
+    SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
+    SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
+    DataElement,
+    ServiceAttribute,
 )
-from bumble.core import (
-    BT_GENERIC_AUDIO_SERVICE, BT_HANDSFREE_SERVICE,
-    BT_L2CAP_PROTOCOL_ID, BT_RFCOMM_PROTOCOL_ID
-)
+from typing import Any, Dict, List, Optional
 
 
 class BumbleDevice:
@@ -46,7 +43,7 @@ class BumbleDevice:
 
     # HCI transport name & instance.
     _hci_name: str
-    _hci: Optional[transport.Transport]
+    _hci: Optional[transport.Transport]  # type: ignore[name-defined]
 
     def __init__(self, config: Dict[str, Any]) -> None:
         self.config = config
@@ -64,7 +61,7 @@ class BumbleDevice:
 
         # open HCI transport & set device host.
         self._hci = await transport.open_transport(self._hci_name)
-        self.device.host = Host(controller_source=self._hci.source, controller_sink=self._hci.sink)
+        self.device.host = Host(controller_source=self._hci.source, controller_sink=self._hci.sink)  # type: ignore[no-untyped-call]
 
         # power-on.
         await self.device.power_on()
@@ -75,7 +72,7 @@ class BumbleDevice:
 
         # flush & re-initialize device.
         await self.device.host.flush()
-        self.device.host = None
+        self.device.host = None  # type: ignore[assignment]
         self.device = _make_device(self.config)
 
         # close HCI transport.
@@ -87,11 +84,9 @@ class BumbleDevice:
         await self.open()
 
     def info(self) -> Optional[Dict[str, str]]:
-        if self.device is None:
-            return None
         return {
             'public_bd_address': str(self.device.public_address),
-            'random_address': str(self.device.random_address)
+            'random_address': str(self.device.random_address),
         }
 
 
@@ -115,36 +110,33 @@ def _make_device(config: Dict[str, Any]) -> Device:
 def _make_sdp_records(rfcomm_channel: int) -> Dict[int, List[ServiceAttribute]]:
     return {
         0x00010001: [
-            ServiceAttribute(
-                SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
-                DataElement.unsigned_integer_32(0x00010001)
-            ),
+            ServiceAttribute(SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID, DataElement.unsigned_integer_32(0x00010001)),
             ServiceAttribute(
                 SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
-                DataElement.sequence([
-                    DataElement.uuid(BT_HANDSFREE_SERVICE),
-                    DataElement.uuid(BT_GENERIC_AUDIO_SERVICE)
-                ])
+                DataElement.sequence(
+                    [DataElement.uuid(BT_HANDSFREE_SERVICE), DataElement.uuid(BT_GENERIC_AUDIO_SERVICE)]
+                ),
             ),
             ServiceAttribute(
                 SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-                DataElement.sequence([
-                    DataElement.sequence(
-                        [DataElement.uuid(BT_L2CAP_PROTOCOL_ID)]),
-                    DataElement.sequence([
-                        DataElement.uuid(BT_RFCOMM_PROTOCOL_ID),
-                        DataElement.unsigned_integer_8(rfcomm_channel)
-                    ])
-                ])
+                DataElement.sequence(
+                    [
+                        DataElement.sequence([DataElement.uuid(BT_L2CAP_PROTOCOL_ID)]),
+                        DataElement.sequence(
+                            [DataElement.uuid(BT_RFCOMM_PROTOCOL_ID), DataElement.unsigned_integer_8(rfcomm_channel)]
+                        ),
+                    ]
+                ),
             ),
             ServiceAttribute(
                 SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-                DataElement.sequence([
-                    DataElement.sequence([
-                        DataElement.uuid(BT_HANDSFREE_SERVICE),
-                        DataElement.unsigned_integer_16(0x0105)
-                    ])
-                ])
-            )
+                DataElement.sequence(
+                    [
+                        DataElement.sequence(
+                            [DataElement.uuid(BT_HANDSFREE_SERVICE), DataElement.unsigned_integer_16(0x0105)]
+                        )
+                    ]
+                ),
+            ),
         ]
     }
