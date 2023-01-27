@@ -32,7 +32,7 @@ from mobly.controllers.android_device import AndroidDevice
 from avatar.bumble_device import BumbleDevice
 from avatar.bumble_server import serve_bumble
 from avatar.pandora_client import PandoraClient, BumblePandoraClient
-from avatar.controllers import bumble_device
+from avatar.controllers import pandora_device, bumble_device
 
 ANDROID_SERVER_PACKAGE = 'com.android.pandora'
 ANDROID_SERVER_GRPC_PORT = 8999 # TODO: Use a dynamic port
@@ -44,7 +44,7 @@ TDevice = TypeVar('TDevice')
 class PandoraServer(Generic[TDevice]):
     """Abstract interface to manage the Pandora gRPC server on the device."""
 
-    MOBLY_CONTROLLER_MODULE: types.ModuleType
+    MOBLY_CONTROLLER_MODULE: types.ModuleType = pandora_device
 
     device: TDevice
 

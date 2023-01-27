@@ -25,6 +25,7 @@ from avatar import pandora_client
 from avatar import pandora_server
 
 PANDORA_COMMON_SERVER_CLASSES = {
+    'PandoraDevice': pandora_server.PandoraServer,
     'AndroidDevice': pandora_server.AndroidPandoraServer,
     'BumbleDevice': pandora_server.BumblePandoraServer,
 }
