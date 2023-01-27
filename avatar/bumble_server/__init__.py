@@ -12,131 +12,88 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Bumble Pandora server."""
 
-""" Bumble Pandora Server for Avatar"""
+__version__ = "0.0.1"
 
 import asyncio
-import avatar
 import grpc
+import logging
+import os
+import sys
+import traceback
 
-from contextlib import suppress
+from typing import NoReturn, Optional
 
 from bumble.smp import PairingDelegate
 
-from avatar.pandora_client import PandoraClient
-from avatar.controllers import bumble_device
-from avatar.servers import pandora_server
-
-from avatar.bumble_server.host import HostService
 from pandora.host_grpc import add_HostServicer_to_server
-
-from avatar.bumble_server.security import SecurityService, SecurityStorageService
 from pandora.security_grpc import add_SecurityServicer_to_server, add_SecurityStorageServicer_to_server
-
-from avatar.bumble_server.asha import ASHAService
 from pandora.asha_grpc import add_ASHAServicer_to_server
 
-
-class BumblePandoraServer(pandora_server.PandoraServer[bumble_device.BumbleDevice]):
-    MOBLY_CONTROLLER_MODULE = bumble_device
-
-    _grpc_server: grpc.aio.server = None
-
-    _grpc_port: int = 0
-
-    _server_task: asyncio.Task = None
-
-    def start(self) -> PandoraClient:
-        """Run the bumble pandora server over given transport."""
-
-        async def coro():
-            await self.__prepare_grpc_server()
-
-        avatar.run_until_complete(coro())
-
-        self._server_task = avatar.loop.create_task(
-            self.__serve()
-        )
-
-        return PandoraClient(f"localhost:{self._grpc_port}", self.device)
-
-    def stop(self) -> None:
-        """Stop the bumble pandora."""
-
-        async def coro():
-            self._server_task.cancel()
-            with suppress(asyncio.CancelledError): await self._server_task
-
-        avatar.run_until_complete(coro())
-
-    def reset(self):
-        self.stop()
-        self.start()
-
-    def wait_for_termination(self):
-        async def coro():
-            await self._server_task
-
-        avatar.run_until_complete(coro())
-
-    async def __prepare_grpc_server(self):
-        self._grpc_server = grpc.aio.server()
-        self._grpc_port = self._grpc_server.add_insecure_port(
-            f"localhost:{self._grpc_port}"
-        )
-        io_capability = getattr(
-            PairingDelegate, self.device.io_capability_name
-        )
-        add_HostServicer_to_server(
-            await HostService(
-                self._grpc_server, self.device.device
-            ).start(),
-            self._grpc_server,
-        )
-        add_SecurityServicer_to_server(
-            SecurityService(self.device.device, io_capability),
-            self._grpc_server,
-        )
-        add_SecurityStorageServicer_to_server(
-            SecurityStorageService(self.device.device), self._grpc_server
-        )
-        add_ASHAServicer_to_server(
-            ASHAService(self.device.device), self._grpc_server
-        )
-        await self._grpc_server.start()
-
-    async def __serve(self) -> None:
-        try:
-            while True:
-                await self._grpc_server.wait_for_termination()
-                await self.device.reset()
-                await self.__prepare_grpc_server()
-
-        finally:
-            await self._grpc_server.stop(None)
-
-    @property
-    def grpc_port(self) -> int:
-        return self._grpc_port
-
-    @grpc_port.setter
-    def grpc_port(self, port: int) -> None:
-        self._grpc_port = port
+from avatar.bumble_device import BumbleDevice
+from avatar.bumble_server.host import HostService
+from avatar.bumble_server.security import SecurityService, SecurityStorageService
+from avatar.bumble_server.asha import ASHAService
 
 
-if __name__ == "__main__":
-    # 7300 for cuttlefish rootcanal hci port
-    config = [{
-        "transport": "tcp-client:127.0.0.1:7300",
-        "classic_enabled": True,
-    }]
-    devices = bumble_device.create(config)
-    dev = devices[0]
-    server = BumblePandoraServer(dev)
-    server.grpc_port = 7999
-    server.start()
+async def serve_bumble(
+    bumble: BumbleDevice,
+    server: Optional[grpc.aio.Server] = None,
+    port: int = 0,
+) -> NoReturn:
+    # load IO capability from config.
+    io_capability_name = bumble.config.get('io_capability', 'no_output_no_input').upper()
+    io_capability = getattr(PairingDelegate, io_capability_name)
+
+    if server is None:
+        server = grpc.aio.server()
+
     try:
-        server.wait_for_termination()
-    except KeyboardInterrupt:
-        pass
-    server.stop()
+        while True:
+            # add Pandora services to the gRPC server.
+            add_HostServicer_to_server(HostService(server, bumble.device), server)
+            add_SecurityServicer_to_server(SecurityService(bumble.device, io_capability), server)
+            add_SecurityStorageServicer_to_server(SecurityStorageService(bumble.device), server)
+            add_ASHAServicer_to_server(ASHAService(bumble.device), server)
+
+            try:
+                # open device.
+                await bumble.open()
+            except:
+                print(traceback.format_exc(), end='', file=sys.stderr)
+                os._exit(1)
+
+            try:
+                # Pandora require classic devices to to be discoverable & connectable.
+                if bumble.device.classic_enabled:
+                    await bumble.device.set_discoverable(False)
+                    await bumble.device.set_connectable(True)
+
+                # start & serve gRPC server.
+                await server.start()
+                await server.wait_for_termination()
+
+            finally:
+                # close device.
+                await bumble.close()
+
+            # re-initialize the gRPC server.
+            server = grpc.aio.server()
+            port = server.add_insecure_port(f'localhost:{port}')
+    finally:
+        # stop server.
+        await server.stop(None)
+
+
+BUMBLE_SERVER_GRPC_PORT = 7999
+ROOTCANAL_PORT_CUTTLEFISH = 7300
+
+if __name__ == '__main__':
+    bumble = BumbleDevice({
+        'transport': f'tcp-client:127.0.0.1:{ROOTCANAL_PORT_CUTTLEFISH}',
+        'classic_enabled': True
+    })
+
+    logging.basicConfig(level=logging.DEBUG)
+    asyncio.run(serve_bumble(bumble, port=BUMBLE_SERVER_GRPC_PORT))

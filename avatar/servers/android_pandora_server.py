@@ -52,7 +52,7 @@ class AndroidPandoraServer(pandora_server.PandoraServer[AndroidDevice]):
         # Wait a few seconds for the Android gRPC server to be started.
         time.sleep(3)
 
-        return PandoraClient(f'localhost:{ANDROID_SERVER_GRPC_PORT}', None)
+        return PandoraClient(f'localhost:{ANDROID_SERVER_GRPC_PORT}')
 
     def stop(self) -> None:
         """Stops and cleans up the Pandora server on the Android device."""

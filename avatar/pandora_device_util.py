@@ -21,13 +21,13 @@ from typing import List
 
 from mobly import base_test
 
-from avatar import pandora_client, bumble_server
+from avatar import pandora_client
 from avatar.servers import android_pandora_server
 from avatar.servers import pandora_server
 
 PANDORA_COMMON_SERVER_CLASSES = {
     'AndroidDevice': android_pandora_server.AndroidPandoraServer,
-    'BumbleDevice': bumble_server.BumblePandoraServer,
+    'BumbleDevice': pandora_server.BumblePandoraServer,
 }
 
 KEY_PANDORA_SERVER_CLASS = 'pandora_server_class'

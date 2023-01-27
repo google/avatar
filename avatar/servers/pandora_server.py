@@ -15,10 +15,19 @@
 
 """Interface for controller-specific Pandora server management."""
 
+import asyncio
+import avatar
+import grpc
 import types
-from typing import Generic, TypeVar
 
-from avatar.pandora_client import PandoraClient
+from contextlib import suppress
+
+from typing import NoReturn, Optional, TypeVar, Generic
+
+from avatar.bumble_device import BumbleDevice
+from avatar.bumble_server import serve_bumble
+from avatar.pandora_client import PandoraClient, BumblePandoraClient
+from avatar.controllers import bumble_device
 
 
 # Generic type for `PandoraServer`.
@@ -46,3 +55,39 @@ class PandoraServer(Generic[TDevice]):
 
     def stop(self) -> None:
         """Stops and cleans up the Pandora server on the device."""
+
+
+class BumblePandoraServer(PandoraServer[BumbleDevice]):
+    """Manages the Pandora gRPC server on an BumbleDevice."""
+
+    MOBLY_CONTROLLER_MODULE = bumble_device
+
+    _task: Optional[asyncio.Task[NoReturn]] = None
+
+    def start(self) -> BumblePandoraClient:
+        """Sets up and starts the Pandora server on the Bumble device."""
+        assert self._task is None
+
+        # set the event loop to make sure the gRPC server use the avatar one.
+        asyncio.set_event_loop(avatar.loop)
+
+        # create gRPC server & port.
+        server = grpc.aio.server()
+        port = server.add_insecure_port(f'localhost:{0}')
+
+        self._task = avatar.loop.create_task(serve_bumble(
+            self.device,
+            server=server,
+            port=port,
+        ))
+
+        return BumblePandoraClient(f'localhost:{port}', self.device)
+
+    def stop(self) -> None:
+        """Stops and cleans up the Pandora server on the Bumble device."""
+        async def server_stop() -> None:
+            assert self._task is not None
+            self._task.cancel()
+            with suppress(asyncio.CancelledError): await self._task
+
+        avatar.run_until_complete(server_stop())

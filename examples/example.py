@@ -26,7 +26,7 @@ from mobly.asserts import *
 from bumble.smp import PairingDelegate
 
 from avatar.utils import Address, AsyncQueue
-from avatar.pandora_client import PandoraClient
+from avatar.pandora_client import BumblePandoraClient, PandoraClient
 from avatar.pandora_device_util import PandoraDeviceUtil
 from pandora.host_pb2 import (
     DiscoverabilityMode, DataTypes, OwnAddressType
@@ -36,6 +36,9 @@ from pandora.security_pb2 import (
 )
 
 class ExampleTest(base_test.BaseTestClass):
+    dut: PandoraClient
+    ref: BumblePandoraClient
+
     def setup_class(self):
         self.pandora_util = PandoraDeviceUtil(self)
         self.dut, self.ref = self.pandora_util.get_pandora_devices()
@@ -90,7 +93,7 @@ class ExampleTest(base_test.BaseTestClass):
             scan_response = next((x for x in peers if x.public == self.ref.address))
             connection = self.dut.host.ConnectLE(public=scan_response.public, own_address_type=dut_address_type).connection
         else:
-            scan_response = next((x for x in peers if x.random == Address(self.ref.device.random_address)))
+            scan_response = next((x for x in peers if x.random == self.ref.random_address))
             connection = self.dut.host.ConnectLE(random=scan_response.random, own_address_type=dut_address_type).connection
         peers.cancel()
         self.dut.host.Disconnect(connection=connection)
@@ -259,7 +262,7 @@ class ExampleTest(base_test.BaseTestClass):
         if ref_address_type in (OwnAddressType.PUBLIC, OwnAddressType.RESOLVABLE_OR_PUBLIC):
             ref_address = {'public': self.ref.address}
         else:
-            ref_address = {'random': Address(self.ref.device.random_address)}
+            ref_address = {'random': self.ref.random_address}
 
         await self.dut.security_storage.DeleteBond(**ref_address)
         await self.dut.host.StartAdvertising(
