@@ -25,9 +25,8 @@ from mobly.asserts import *
 
 from bumble.smp import PairingDelegate
 
-from avatar import AsyncQueue
+from avatar import AsyncQueue, PandoraDevices
 from avatar.pandora_client import Address, BumblePandoraClient, PandoraClient
-from avatar.pandora_device_util import PandoraDeviceUtil
 from pandora.host_pb2 import (
     DiscoverabilityMode, DataTypes, OwnAddressType
 )
@@ -40,11 +39,11 @@ class ExampleTest(base_test.BaseTestClass):
     ref: BumblePandoraClient
 
     def setup_class(self):
-        self.pandora_util = PandoraDeviceUtil(self)
-        self.dut, self.ref = self.pandora_util.get_pandora_devices()
+        self.devices = PandoraDevices(self)
+        self.dut, self.ref = self.devices
 
     def teardown_class(self):
-        self.pandora_util.cleanup()
+        self.devices.stop_all()
 
     @avatar.asynchronous
     async def setup_test(self):

@@ -20,8 +20,8 @@ import grpc
 from mobly import test_runner, base_test
 from bumble.gatt import GATT_ASHA_SERVICE
 
-from avatar.pandora_client import PandoraClient
-from avatar.pandora_device_util import PandoraDeviceUtil
+from avatar import PandoraDevices
+from avatar.pandora_client import PandoraClient, BumblePandoraClient
 from pandora.host_pb2 import (
     DiscoverabilityMode, DataTypes, OwnAddressType, Connection,
     ConnectabilityMode, OwnAddressType
@@ -31,12 +31,15 @@ from pandora.host_pb2 import (
 class ASHATest(base_test.BaseTestClass):
     ASHA_UUID = GATT_ASHA_SERVICE.to_hex_str()
 
+    dut: PandoraClient
+    ref: BumblePandoraClient
+
     def setup_class(self):
-        self.pandora_util = PandoraDeviceUtil(self)
-        self.dut, self.ref = self.pandora_util.get_pandora_devices()
+        self.devices = PandoraDevices(self)
+        self.dut, self.ref = self.devices
 
     def teardown_class(self):
-        self.pandora_util.cleanup()
+        self.devices.stop_all()
 
     @avatar.asynchronous
     async def setup_test(self):
