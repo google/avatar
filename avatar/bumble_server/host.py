@@ -19,7 +19,7 @@ import grpc.aio
 import logging
 import struct
 
-from avatar.bumble_server.utils import address_from_request
+from avatar.bumble_server.utils import BumbleServerLoggerAdapter, address_from_request
 from bumble.core import BT_BR_EDR_TRANSPORT, BT_LE_TRANSPORT, UUID, AdvertisingData, ConnectionError
 from bumble.device import (
     DEVICE_DEFAULT_SCAN_INTERVAL,
@@ -92,13 +92,14 @@ class HostService(HostServicer):
 
     def __init__(self, grpc_server: grpc.aio.Server, device: Device) -> None:
         super().__init__()
+        self.log = BumbleServerLoggerAdapter(logging.getLogger(), {'service_name': 'Host', 'device': device})
         self.grpc_server = grpc_server
         self.device = device
         self.scan_queue = asyncio.Queue()
         self.inquiry_queue = asyncio.Queue()
 
     async def FactoryReset(self, request: empty_pb2.Empty, context: grpc.ServicerContext) -> empty_pb2.Empty:
-        logging.info('FactoryReset')
+        self.log.info('FactoryReset')
 
         # delete all bonds
         if self.device.keystore is not None:
@@ -109,7 +110,7 @@ class HostService(HostServicer):
         return empty_pb2.Empty()
 
     async def Reset(self, request: empty_pb2.Empty, context: grpc.ServicerContext) -> empty_pb2.Empty:
-        logging.info('Reset')
+        self.log.info('Reset')
 
         # (re) power device on
         await self.device.power_on()
@@ -118,28 +119,28 @@ class HostService(HostServicer):
     async def ReadLocalAddress(
         self, request: empty_pb2.Empty, context: grpc.ServicerContext
     ) -> ReadLocalAddressResponse:
-        logging.info('ReadLocalAddress')
+        self.log.info('ReadLocalAddress')
         return ReadLocalAddressResponse(address=bytes(reversed(bytes(self.device.public_address))))
 
     async def Connect(self, request: ConnectRequest, context: grpc.ServicerContext) -> ConnectResponse:
         # Need to reverse bytes order since Bumble Address is using MSB.
         address = Address(bytes(reversed(request.address)), address_type=Address.PUBLIC_DEVICE_ADDRESS)
-        logging.info(f"Connect: {address}")
+        self.log.info(f"Connect: {address}")
 
         try:
-            logging.info("Connecting...")
+            self.log.info("Connecting...")
             connection = await self.device.connect(address, transport=BT_BR_EDR_TRANSPORT)
-            logging.info("Connected")
+            self.log.info("Connected")
         except ConnectionError as e:
             if e.error_code == HCI_PAGE_TIMEOUT_ERROR:
-                logging.warning(f"Peer not found: {e}")
+                self.log.warning(f"Peer not found: {e}")
                 return ConnectResponse(peer_not_found=empty_pb2.Empty())
             if e.error_code == HCI_CONNECTION_ALREADY_EXISTS_ERROR:
-                logging.warning(f"Connection already exists: {e}")
+                self.log.warning(f"Connection already exists: {e}")
                 return ConnectResponse(connection_already_exists=empty_pb2.Empty())
             raise e
 
-        logging.info(f"Connect: connection handle: {connection.handle}")
+        self.log.info(f"Connect: connection handle: {connection.handle}")
         cookie = any_pb2.Any(value=connection.handle.to_bytes(4, 'big'))
         return ConnectResponse(connection=Connection(cookie=cookie))
 
@@ -148,7 +149,7 @@ class HostService(HostServicer):
     ) -> GetConnectionResponse:
         # Need to reverse bytes order since Bumble Address is using MSB.
         address = Address(bytes(reversed(request.address)))
-        logging.info(f"GetConnection: {address}")
+        self.log.info(f"GetConnection: {address}")
 
         if not (connection := self.device.find_connection_by_bd_addr(address, transport=BT_BR_EDR_TRANSPORT)):
             return GetConnectionResponse(peer_not_found=empty_pb2.Empty())
@@ -162,43 +163,43 @@ class HostService(HostServicer):
         # Need to reverse bytes order since Bumble Address is using MSB.
         if request.address:
             address = Address(bytes(reversed(request.address)), address_type=Address.PUBLIC_DEVICE_ADDRESS)
-            logging.info(f"WaitConnection: {address}")
+            self.log.info(f"WaitConnection: {address}")
 
             if connection := self.device.find_connection_by_bd_addr(address, transport=BT_BR_EDR_TRANSPORT):
                 cookie = any_pb2.Any(value=connection.handle.to_bytes(4, 'big'))
                 return WaitConnectionResponse(connection=Connection(cookie=cookie))
         else:
             address = Address.ANY
-            logging.info(f"WaitConnection: {address}")
+            self.log.info(f"WaitConnection: {address}")
 
-        logging.info("Wait connection...")
+        self.log.info("Wait connection...")
         connection = await self.device.accept(address)
-        logging.info("Connected")
+        self.log.info("Connected")
 
-        logging.info(f"WaitConnection: connection handle: {connection.handle}")
+        self.log.info(f"WaitConnection: connection handle: {connection.handle}")
         cookie = any_pb2.Any(value=connection.handle.to_bytes(4, 'big'))
         return WaitConnectionResponse(connection=Connection(cookie=cookie))
 
     async def ConnectLE(self, request: ConnectLERequest, context: grpc.ServicerContext) -> ConnectLEResponse:
         address = address_from_request(request, request.WhichOneof("address"))
-        logging.info(f"ConnectLE: {address}")
+        self.log.info(f"ConnectLE: {address}")
 
         try:
-            logging.info("Connecting...")
+            self.log.info("Connecting...")
             connection: BumbleConnection = await self.device.connect(
                 address, transport=BT_LE_TRANSPORT, own_address_type=request.own_address_type
             )
-            logging.info("Connected")
+            self.log.info("Connected")
         except ConnectionError as e:
             if e.error_code == HCI_PAGE_TIMEOUT_ERROR:
-                logging.warning(f"Peer not found: {e}")
+                self.log.warning(f"Peer not found: {e}")
                 return ConnectLEResponse(peer_not_found=empty_pb2.Empty())
             if e.error_code == HCI_CONNECTION_ALREADY_EXISTS_ERROR:
-                logging.warning(f"Connection already exists: {e}")
+                self.log.warning(f"Connection already exists: {e}")
                 return ConnectLEResponse(connection_already_exists=empty_pb2.Empty())
             raise e
 
-        logging.info(f"ConnectLE: connection handle: {connection.handle}")
+        self.log.info(f"ConnectLE: connection handle: {connection.handle}")
         cookie = any_pb2.Any(value=connection.handle.to_bytes(4, 'big'))
         return ConnectLEResponse(connection=Connection(cookie=cookie))
 
@@ -206,7 +207,7 @@ class HostService(HostServicer):
         self, request: GetLEConnectionRequest, context: grpc.ServicerContext
     ) -> GetLEConnectionResponse:
         address = address_from_request(request, request.WhichOneof("address"))
-        logging.info(f"GetLEConnection: {address}")
+        self.log.info(f"GetLEConnection: {address}")
 
         connection = self.device.find_connection_by_bd_addr(
             address, transport=BT_LE_TRANSPORT, check_address_type=True
@@ -222,7 +223,7 @@ class HostService(HostServicer):
         self, request: WaitLEConnectionRequest, context: grpc.ServicerContext
     ) -> WaitLEConnectionResponse:
         address = address_from_request(request, request.WhichOneof("address"))
-        logging.info(f"WaitLEConnection: {address}")
+        self.log.info(f"WaitLEConnection: {address}")
 
         if address != Address.ANY:
             if conn := self.device.find_connection_by_bd_addr(
@@ -266,12 +267,12 @@ class HostService(HostServicer):
 
     async def Disconnect(self, request: DisconnectRequest, context: grpc.ServicerContext) -> empty_pb2.Empty:
         connection_handle = int.from_bytes(request.connection.cookie.value, 'big')
-        logging.info(f"Disconnect: {connection_handle}")
+        self.log.info(f"Disconnect: {connection_handle}")
 
-        logging.info("Disconnecting...")
+        self.log.info("Disconnecting...")
         if connection := self.device.lookup_connection(connection_handle):
             await connection.disconnect(HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR)
-        logging.info("Disconnected")
+        self.log.info("Disconnected")
 
         return empty_pb2.Empty()
 
@@ -279,7 +280,7 @@ class HostService(HostServicer):
         self, request: WaitDisconnectionRequest, context: grpc.ServicerContext
     ) -> empty_pb2.Empty:
         connection_handle = int.from_bytes(request.connection.cookie.value, 'big')
-        logging.info(f"WaitDisconnection: {connection_handle}")
+        self.log.info(f"WaitDisconnection: {connection_handle}")
 
         if connection := self.device.lookup_connection(connection_handle):
             disconnection_future: asyncio.Future[None] = asyncio.get_running_loop().create_future()
@@ -289,7 +290,7 @@ class HostService(HostServicer):
 
             connection.on('disconnection', on_disconnection)
             await disconnection_future
-            logging.info("Disconnected")
+            self.log.info("Disconnected")
 
         return empty_pb2.Empty()
 
@@ -308,7 +309,7 @@ class HostService(HostServicer):
         assert not request.primary_phy
         assert not request.secondary_phy
 
-        logging.info('StartAdvertising')
+        self.log.info('StartAdvertising')
 
         if data := request.data:
             self.device.advertising_data = bytes(self.unpack_data_types(data))
@@ -372,7 +373,7 @@ class HostService(HostServicer):
 
     # TODO: use advertising set commands
     async def StopAdvertising(self, request: StopAdvertisingRequest, context: grpc.ServicerContext) -> empty_pb2.Empty:
-        logging.info('StopAdvertising')
+        self.log.info('StopAdvertising')
         await self.device.stop_advertising()
         return empty_pb2.Empty()
 
@@ -383,7 +384,7 @@ class HostService(HostServicer):
         # TODO: modify `start_scanning` to accept floats instead of int for ms values
         assert not request.phys
 
-        logging.info('Scan')
+        self.log.info('Scan')
 
         handler = self.device.on('advertisement', self.scan_queue.put_nowait)
         await self.device.start_scanning(
@@ -430,7 +431,7 @@ class HostService(HostServicer):
     async def Inquiry(
         self, request: empty_pb2.Empty, context: grpc.ServicerContext
     ) -> AsyncGenerator[InquiryResponse, None]:
-        logging.info('Inquiry')
+        self.log.info('Inquiry')
 
         complete_handler = self.device.on('inquiry_complete', lambda: self.inquiry_queue.put_nowait(None))
         result_handler = self.device.on(  # type: ignore
@@ -461,14 +462,14 @@ class HostService(HostServicer):
     async def SetDiscoverabilityMode(
         self, request: SetDiscoverabilityModeRequest, context: grpc.ServicerContext
     ) -> empty_pb2.Empty:
-        logging.info("SetDiscoverabilityMode")
+        self.log.info("SetDiscoverabilityMode")
         await self.device.set_discoverable(request.mode != DiscoverabilityMode.NOT_DISCOVERABLE)
         return empty_pb2.Empty()
 
     async def SetConnectabilityMode(
         self, request: SetConnectabilityModeRequest, context: grpc.ServicerContext
     ) -> empty_pb2.Empty:
-        logging.info("SetConnectabilityMode")
+        self.log.info("SetConnectabilityMode")
         await self.device.set_connectable(request.mode != ConnectabilityMode.NOT_CONNECTABLE)
         return empty_pb2.Empty()
 
@@ -479,7 +480,7 @@ class HostService(HostServicer):
         if request.remote_variant == 'connection':
             assert request.connection
             connection_handle = int.from_bytes(request.connection.cookie.value, 'big')
-            logging.info(f"GetRemoteName: {connection_handle}")
+            self.log.info(f"GetRemoteName: {connection_handle}")
 
             connection = self.device.lookup_connection(connection_handle)
             assert connection
@@ -488,7 +489,7 @@ class HostService(HostServicer):
             # Need to reverse bytes order since Bumble Address is using MSB.
             assert request.address
             remote = Address(bytes(reversed(request.address)), address_type=Address.PUBLIC_DEVICE_ADDRESS)
-            logging.info(f"GetRemoteName: {remote}")
+            self.log.info(f"GetRemoteName: {remote}")
 
         try:
             assert remote
@@ -496,7 +497,7 @@ class HostService(HostServicer):
             return GetRemoteNameResponse(name=remote_name)
         except HCI_Error as e:
             if e.error_code == HCI_PAGE_TIMEOUT_ERROR:
-                logging.warning(f"Peer not found: {e}")
+                self.log.warning(f"Peer not found: {e}")
                 return GetRemoteNameResponse(remote_not_found=empty_pb2.Empty())
             raise e
 

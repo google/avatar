@@ -15,6 +15,7 @@
 import grpc
 import logging
 
+from avatar.bumble_server.utils import BumbleServerLoggerAdapter
 from bumble.device import Device
 from bumble.profiles.asha_service import AshaService
 from google.protobuf.empty_pb2 import Empty
@@ -28,11 +29,12 @@ class ASHAService(ASHAServicer):
     asha_service: Optional[AshaService]
 
     def __init__(self, device: Device) -> None:
+        self.log = BumbleServerLoggerAdapter(logging.getLogger(), {'service_name': 'Asha', 'device': device})
         self.device = device
         self.asha_service = None
 
     async def Register(self, request: RegisterRequest, context: grpc.ServicerContext) -> Empty:
-        logging.info('Register')
+        self.log.info('Register')
         # asha service from bumble profile
         self.asha_service = AshaService(request.capability, request.hisyncid, self.device)
         self.device.add_service(self.asha_service)  # type: ignore[no-untyped-call]

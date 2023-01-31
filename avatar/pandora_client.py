@@ -61,7 +61,7 @@ class PandoraClient:
     _address: Address  # Bluetooth device address
     _aio: Optional['PandoraClient.Aio']  # Asynchronous gRPC channel.
 
-    def __init__(self, grpc_target: str) -> None:
+    def __init__(self, grpc_target: str, name: str = '..') -> None:
         """Creates a PandoraClient.
 
         Establishes a channel with the Pandora gRPC server.
@@ -70,7 +70,7 @@ class PandoraClient:
           grpc_target: Server address for the gRPC channel.
         """
         self.grpc_target = grpc_target
-        self.log = PandoraClientLoggerAdapter(logging.getLogger(), {'obj': self})
+        self.log = PandoraClientLoggerAdapter(logging.getLogger(), {'client': self, 'client_name': name})
         self.channel = grpc.insecure_channel(grpc_target)  # type: ignore
         self._address = Address(b'\x00\x00\x00\x00\x00\x00')
         self._aio = None
@@ -149,10 +149,11 @@ class PandoraClientLoggerAdapter(logging.LoggerAdapter):  # type: ignore
 
     def process(self, msg: str, kwargs: MutableMapping[str, Any]) -> Tuple[str, MutableMapping[str, Any]]:
         assert self.extra
-        obj = self.extra['obj']
-        assert isinstance(obj, PandoraClient)
-        msg = f'[{obj.__class__.__name__}|{obj.address}] {msg}'
-        return (msg, kwargs)
+        client = self.extra['client']
+        assert isinstance(client, PandoraClient)
+        client_name = self.extra.get('client_name', client.__class__.__name__)
+        addr = ':'.join([f'{x:02X}' for x in client.address[4:]])
+        return (f'[{client_name}:{addr}] {msg}', kwargs)
 
 
 class BumblePandoraClient(PandoraClient):
@@ -161,8 +162,8 @@ class BumblePandoraClient(PandoraClient):
     _bumble: BumbleDevice  # Bumble device wrapper.
 
     def __init__(self, grpc_target: str, bumble: BumbleDevice) -> None:
+        super().__init__(grpc_target, 'bumble')
         self._bumble = bumble
-        super().__init__(grpc_target)
 
     @property
     def device(self) -> bumble.device.Device:

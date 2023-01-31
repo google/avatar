@@ -16,7 +16,7 @@ import asyncio
 import grpc
 import logging
 
-from avatar.bumble_server.utils import address_from_request
+from avatar.bumble_server.utils import BumbleServerLoggerAdapter, address_from_request
 from bumble import hci
 from bumble.core import BT_BR_EDR_TRANSPORT, BT_LE_TRANSPORT
 from bumble.device import Connection as BumbleConnection, Device
@@ -51,6 +51,9 @@ class PairingDelegate(BasePairingDelegate):
         local_initiator_key_distribution: int = BasePairingDelegate.DEFAULT_KEY_DISTRIBUTION,
         local_responder_key_distribution: int = BasePairingDelegate.DEFAULT_KEY_DISTRIBUTION,
     ) -> None:
+        self.log = BumbleServerLoggerAdapter(
+            logging.getLogger(), {'service_name': 'Security', 'device': connection.device}
+        )
         self.connection = connection
         self.service = service
         super().__init__(io_capability, local_initiator_key_distribution, local_responder_key_distribution)
@@ -71,7 +74,7 @@ class PairingDelegate(BasePairingDelegate):
         return ev
 
     async def confirm(self) -> bool:
-        logging.info(f"Pairing event: `just_works` (io_capability: {self.io_capability})")
+        self.log.info(f"Pairing event: `just_works` (io_capability: {self.io_capability})")
 
         if not self.service.event_queue or not self.service.event_answer:
             return True
@@ -84,7 +87,7 @@ class PairingDelegate(BasePairingDelegate):
         return answer.confirm
 
     async def compare_numbers(self, number: int, digits: int = 6) -> bool:
-        logging.info(f"Pairing event: `numeric_comparison` (io_capability: {self.io_capability})")
+        self.log.info(f"Pairing event: `numeric_comparison` (io_capability: {self.io_capability})")
 
         if not self.service.event_queue or not self.service.event_answer:
             raise RuntimeError('security: unhandled number comparison request')
@@ -97,7 +100,7 @@ class PairingDelegate(BasePairingDelegate):
         return answer.confirm
 
     async def get_number(self) -> int:
-        logging.info(f"Pairing event: `passkey_entry_request` (io_capability: {self.io_capability})")
+        self.log.info(f"Pairing event: `passkey_entry_request` (io_capability: {self.io_capability})")
 
         if not self.service.event_queue or not self.service.event_answer:
             raise RuntimeError('security: unhandled number request')
@@ -110,7 +113,7 @@ class PairingDelegate(BasePairingDelegate):
         return answer.passkey
 
     async def display_number(self, number: int, digits: int = 6) -> None:
-        logging.info(f"Pairing event: `passkey_entry_notification` (io_capability: {self.io_capability})")
+        self.log.info(f"Pairing event: `passkey_entry_notification` (io_capability: {self.io_capability})")
 
         if not self.service.event_queue:
             raise RuntimeError('security: unhandled number display request')
@@ -147,6 +150,7 @@ LE_LEVEL_REACHED: Dict[LESecurityLevel, Callable[[BumbleConnection], bool]] = {
 
 class SecurityService(SecurityServicer):
     def __init__(self, device: Device, io_capability: int) -> None:
+        self.log = BumbleServerLoggerAdapter(logging.getLogger(), {'service_name': 'Security', 'device': device})
         self.event_queue: Optional[asyncio.Queue[PairingEvent]] = None
         self.event_answer: Optional[AsyncIterator[PairingEventAnswer]] = None
         self.device = device
@@ -167,7 +171,7 @@ class SecurityService(SecurityServicer):
     async def OnPairing(
         self, request: AsyncIterator[PairingEventAnswer], context: grpc.ServicerContext
     ) -> AsyncGenerator[PairingEvent, None]:
-        logging.info('OnPairing')
+        self.log.info('OnPairing')
 
         if self.event_queue:
             raise RuntimeError('already streaming pairing events')
@@ -188,7 +192,7 @@ class SecurityService(SecurityServicer):
 
     async def Secure(self, request: SecureRequest, context: grpc.ServicerContext) -> SecureResponse:
         connection_handle = int.from_bytes(request.connection.cookie.value, 'big')
-        logging.info(f"Secure: {connection_handle}")
+        self.log.info(f"Secure: {connection_handle}")
 
         connection = self.device.lookup_connection(connection_handle)
         assert connection
@@ -204,40 +208,40 @@ class SecurityService(SecurityServicer):
         # trigger pairing if needed
         if self.need_pairing(connection, level):
             try:
-                logging.info('Pair...')
+                self.log.info('Pair...')
                 await connection.pair()
-                logging.info('Paired')
+                self.log.info('Paired')
             except asyncio.CancelledError:
-                logging.warning(f"Connection died during encryption")
+                self.log.warning(f"Connection died during encryption")
                 return SecureResponse(connection_died=empty_pb2.Empty())
             except HCI_Error as e:
-                logging.warning(f"Pairing failure: {e}")
+                self.log.warning(f"Pairing failure: {e}")
                 return SecureResponse(pairing_failure=empty_pb2.Empty())
 
         # trigger authentication if needed
         if self.need_authentication(connection, level):
             try:
-                logging.info('Authenticate...')
+                self.log.info('Authenticate...')
                 await connection.authenticate()
-                logging.info('Authenticated')
+                self.log.info('Authenticated')
             except asyncio.CancelledError:
-                logging.warning(f"Connection died during authentication")
+                self.log.warning(f"Connection died during authentication")
                 return SecureResponse(connection_died=empty_pb2.Empty())
             except HCI_Error as e:
-                logging.warning(f"Authentication failure: {e}")
+                self.log.warning(f"Authentication failure: {e}")
                 return SecureResponse(authentication_failure=empty_pb2.Empty())
 
         # trigger encryption if needed
         if self.need_encryption(connection, level):
             try:
-                logging.info('Encrypt...')
+                self.log.info('Encrypt...')
                 await connection.encrypt()
-                logging.info('Encrypted')
+                self.log.info('Encrypted')
             except asyncio.CancelledError:
-                logging.warning(f"Connection died during encryption")
+                self.log.warning(f"Connection died during encryption")
                 return SecureResponse(connection_died=empty_pb2.Empty())
             except HCI_Error as e:
-                logging.warning(f"Encryption failure: {e}")
+                self.log.warning(f"Encryption failure: {e}")
                 return SecureResponse(encryption_failure=empty_pb2.Empty())
 
         # security level has been reached ?
@@ -247,7 +251,7 @@ class SecurityService(SecurityServicer):
 
     async def WaitSecurity(self, request: WaitSecurityRequest, context: grpc.ServicerContext) -> WaitSecurityResponse:
         connection_handle = int.from_bytes(request.connection.cookie.value, 'big')
-        logging.info(f"WaitSecurity: {connection_handle}")
+        self.log.info(f"WaitSecurity: {connection_handle}")
 
         connection = self.device.lookup_connection(connection_handle)
         assert connection
@@ -262,25 +266,25 @@ class SecurityService(SecurityServicer):
         async def authenticate() -> None:
             assert connection
             if (encryption := connection.encryption) != 0:
-                logging.debug('Disable encryption...')
+                self.log.debug('Disable encryption...')
                 try:
                     await connection.encrypt(enable=False)
                 except:
                     pass
-                logging.debug('Disable encryption: done')
+                self.log.debug('Disable encryption: done')
 
-            logging.debug('Authenticate...')
+            self.log.debug('Authenticate...')
             await connection.authenticate()
-            logging.debug('Authenticate: done')
+            self.log.debug('Authenticate: done')
 
             if encryption != 0 and connection.encryption != encryption:
-                logging.debug('Re-enable encryption...')
+                self.log.debug('Re-enable encryption...')
                 await connection.encrypt()
-                logging.debug('Re-enable encryption: done')
+                self.log.debug('Re-enable encryption: done')
 
         def set_failure(name: str) -> Callable[..., None]:
             def wrapper(*args: Any) -> None:
-                logging.info(f'Wait for security: error `{name}`: {args}')
+                self.log.info(f'Wait for security: error `{name}`: {args}')
                 wait_for_security.set_result(name)
 
             return wrapper
@@ -288,13 +292,13 @@ class SecurityService(SecurityServicer):
         def try_set_success(*_: Any) -> None:
             assert connection
             if self.reached_security_level(connection, level):
-                logging.info(f'Wait for security: done')
+                self.log.info(f'Wait for security: done')
                 wait_for_security.set_result('success')
 
         def on_encryption_change(*_: Any) -> None:
             assert connection
             if self.reached_security_level(connection, level):
-                logging.info(f'Wait for security: done')
+                self.log.info(f'Wait for security: done')
                 wait_for_security.set_result('success')
             elif connection.transport == BT_BR_EDR_TRANSPORT and self.need_authentication(connection, level):
                 nonlocal authenticate_task
@@ -319,7 +323,7 @@ class SecurityService(SecurityServicer):
         if self.reached_security_level(connection, level):
             return WaitSecurityResponse(success=empty_pb2.Empty())
 
-        logging.info('Wait for security...')
+        self.log.info('Wait for security...')
         kwargs = {}
         kwargs[await wait_for_security] = empty_pb2.Empty()
 
@@ -329,19 +333,19 @@ class SecurityService(SecurityServicer):
 
         # wait for `authenticate` to finish if any
         if authenticate_task is not None:
-            logging.info('Wait for authentication...')
+            self.log.info('Wait for authentication...')
             try:
                 await authenticate_task  # type: ignore
             except:
                 pass
-            logging.info('Authenticated')
+            self.log.info('Authenticated')
 
         return WaitSecurityResponse(**kwargs)
 
     def reached_security_level(
         self, connection: BumbleConnection, level: Union[SecurityLevel, LESecurityLevel]
     ) -> bool:
-        logging.debug(
+        self.log.debug(
             str(
                 {
                     'level': level,
@@ -378,12 +382,14 @@ class SecurityService(SecurityServicer):
 
 class SecurityStorageService(SecurityStorageServicer):
     def __init__(self, device: Device) -> None:
-        super().__init__()
+        self.log = BumbleServerLoggerAdapter(
+            logging.getLogger(), {'service_name': 'SecurityStorage', 'device': device}
+        )
         self.device = device
 
     async def IsBonded(self, request: IsBondedRequest, context: grpc.ServicerContext) -> wrappers_pb2.BoolValue:
         address = address_from_request(request, request.WhichOneof("address"))
-        logging.info(f"IsBonded: {address}")
+        self.log.info(f"IsBonded: {address}")
 
         if self.device.keystore is not None:
             is_bonded = await self.device.keystore.get(str(address)) is not None
@@ -394,7 +400,7 @@ class SecurityStorageService(SecurityStorageServicer):
 
     async def DeleteBond(self, request: DeleteBondRequest, context: grpc.ServicerContext) -> empty_pb2.Empty:
         address = address_from_request(request, request.WhichOneof("address"))
-        logging.info(f"DeleteBond: {address}")
+        self.log.info(f"DeleteBond: {address}")
 
         if self.device.keystore is not None:
             with suppress(KeyError):
