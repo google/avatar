@@ -30,7 +30,7 @@ from avatar.pandora_client import BumblePandoraClient, PandoraClient
 from contextlib import suppress
 from mobly.controllers import android_device
 from mobly.controllers.android_device import AndroidDevice
-from typing import Generic, NoReturn, Optional, TypeVar
+from typing import Generic, Optional, TypeVar
 
 ANDROID_SERVER_PACKAGE = 'com.android.pandora'
 ANDROID_SERVER_GRPC_PORT = 8999  # TODO: Use a dynamic port
@@ -69,7 +69,7 @@ class BumblePandoraServer(PandoraServer[BumbleDevice]):
 
     MOBLY_CONTROLLER_MODULE = bumble_device
 
-    _task: Optional[asyncio.Task[NoReturn]] = None
+    _task: Optional[asyncio.Task[None]] = None
 
     def start(self) -> BumblePandoraClient:
         """Sets up and starts the Pandora server on the Bumble device."""
@@ -94,6 +94,7 @@ class BumblePandoraServer(PandoraServer[BumbleDevice]):
             self._task.cancel()
             with suppress(asyncio.CancelledError):
                 await self._task
+            self._task = None
 
         avatar.aio.run_until_complete(server_stop())
 

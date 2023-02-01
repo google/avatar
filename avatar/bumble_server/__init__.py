@@ -29,55 +29,94 @@ from avatar.bumble_server.asha import ASHAService
 from avatar.bumble_server.host import HostService
 from avatar.bumble_server.security import SecurityService, SecurityStorageService
 from bumble.smp import PairingDelegate
+from dataclasses import dataclass
 from pandora.asha_grpc_aio import add_ASHAServicer_to_server
 from pandora.host_grpc_aio import add_HostServicer_to_server
 from pandora.security_grpc_aio import add_SecurityServicer_to_server, add_SecurityStorageServicer_to_server
-from typing import NoReturn, Optional
+from typing import Coroutine, Optional
 
 
-async def serve_bumble(bumble: BumbleDevice, grpc_server: Optional[grpc.aio.Server] = None, port: int = 0) -> NoReturn:
+@dataclass
+class Configuration:
+    io_capability: int
+
+
+@dataclass
+class Server:
+    port: int
+    bumble: BumbleDevice
+    server: grpc.aio.Server
+    config: Configuration
+
+    async def start(self) -> None:
+        device = self.bumble.device
+
+        # add Pandora services to the gRPC server.
+        add_HostServicer_to_server(HostService(self.server, device), self.server)
+        add_SecurityServicer_to_server(SecurityService(device, self.config.io_capability), self.server)
+        add_SecurityStorageServicer_to_server(SecurityStorageService(device), self.server)
+        add_ASHAServicer_to_server(ASHAService(device), self.server)
+
+        try:
+            # open device.
+            await self.bumble.open()
+        except:
+            print(traceback.format_exc(), end='', file=sys.stderr)
+            os._exit(1)  # type: ignore
+
+        # Pandora require classic devices to to be discoverable & connectable.
+        if device.classic_enabled:
+            await device.set_discoverable(False)
+            await device.set_connectable(True)
+
+        # start the gRPC server.
+        await self.server.start()
+
+    async def serve(self) -> None:
+        try:
+            while True:
+                try:
+                    # serve gRPC server.
+                    await self.server.wait_for_termination()
+                except KeyboardInterrupt:
+                    return
+                finally:
+                    # close device.
+                    await self.bumble.close()
+
+                # re-initialize the gRPC server & re-start.
+                self.server = grpc.aio.server()
+                self.port = self.server.add_insecure_port(f'localhost:{self.port}')
+                await self.start()
+        except KeyboardInterrupt:
+            return
+        finally:
+            # stop server.
+            await self.server.stop(None)
+
+
+def serve_bumble(
+    bumble: BumbleDevice,
+    grpc_server: Optional[grpc.aio.Server] = None,
+    port: int = 0,
+) -> Coroutine[None, None, None]:
+    # initialize a gRPC server if not provided.
+    server: grpc.aio.Server = grpc_server if grpc_server is not None else grpc.aio.server()
+
     # load IO capability from config.
     io_capability_name: str = bumble.config.get('io_capability', 'no_output_no_input').upper()
     io_capability: int = getattr(PairingDelegate, io_capability_name)
 
-    # initialize a gRPC server if not provided.
-    server: grpc.aio.Server = grpc_server if grpc_server is not None else grpc.aio.server()
+    # create server.
+    bumble_server = Server(port, bumble, server, Configuration(io_capability))
 
-    try:
-        while True:
-            # add Pandora services to the gRPC server.
-            add_HostServicer_to_server(HostService(server, bumble.device), server)
-            add_SecurityServicer_to_server(SecurityService(bumble.device, io_capability), server)
-            add_SecurityStorageServicer_to_server(SecurityStorageService(bumble.device), server)
-            add_ASHAServicer_to_server(ASHAService(bumble.device), server)
+    # start bumble server.
+    asyncio.run_coroutine_threadsafe(
+        bumble_server.start(),
+        asyncio.get_event_loop(),
+    ).result()
 
-            try:
-                # open device.
-                await bumble.open()
-            except:
-                print(traceback.format_exc(), end='', file=sys.stderr)
-                os._exit(1)  # type: ignore
-
-            try:
-                # Pandora require classic devices to to be discoverable & connectable.
-                if bumble.device.classic_enabled:
-                    await bumble.device.set_discoverable(False)
-                    await bumble.device.set_connectable(True)
-
-                # start & serve gRPC server.
-                await server.start()
-                await server.wait_for_termination()
-
-            finally:
-                # close device.
-                await bumble.close()
-
-            # re-initialize the gRPC server.
-            server = grpc.aio.server()
-            port = server.add_insecure_port(f'localhost:{port}')
-    finally:
-        # stop server.
-        await server.stop(None)
+    return bumble_server.serve()
 
 
 BUMBLE_SERVER_GRPC_PORT = 7999

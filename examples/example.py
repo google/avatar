@@ -30,25 +30,29 @@ from mobly.asserts import assert_is_not_none  # type: ignore
 from mobly.asserts import fail  # type: ignore
 from pandora.host_grpc import ConnectLERequestDict, DataTypes, DiscoverabilityMode, OwnAddressType
 from pandora.security_grpc import DeleteBondRequestDict, LESecurityLevel, PairingEventAnswer, SecurityLevel
-from typing import NoReturn
+from typing import NoReturn, Optional
 
 
 class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
+    devices: Optional[PandoraDevices] = None
+
+    # pandora devices.
     dut: PandoraClient
     ref: BumblePandoraClient
 
     def setup_class(self) -> None:
-        dut, ref = PandoraDevices(self)
+        self.devices = PandoraDevices(self)
+        dut, ref = self.devices
         assert isinstance(ref, BumblePandoraClient)
         self.dut, self.ref = dut, ref
 
+    def teardown_class(self) -> None:
+        if self.devices:
+            self.devices.stop_all()
+
     @asynchronous
     async def setup_test(self) -> None:
-        async def reset(device: PandoraClient) -> None:
-            await device.aio.host.FactoryReset()
-            device.address = (await device.aio.host.ReadLocalAddress(wait_for_ready=True)).address  # type: ignore[assignment]
-
-        await asyncio.gather(reset(self.dut), reset(self.ref))
+        await asyncio.gather(self.dut.reset(), self.ref.reset())
 
     def test_print_addresses(self) -> None:
         dut_address = self.dut.address
