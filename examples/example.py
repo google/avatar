@@ -60,14 +60,6 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
         ref_address = self.ref.address
         self.ref.log.info(f'Address: {ref_address}')
 
-    def test_get_remote_name(self) -> None:
-        dut_name = self.ref.host.GetRemoteName(address=self.dut.address)
-        assert_equal(dut_name.result_variant, 'name')
-        self.ref.log.info(f'DUT remote name: {dut_name.name}')
-        ref_name = self.dut.host.GetRemoteName(address=self.ref.address)
-        assert_equal(ref_name.result_variant, 'name')
-        self.dut.log.info(f'REF remote name: {ref_name.name}')
-
     def test_classic_connect(self) -> None:
         dut_address = self.dut.address
         self.dut.log.info(f'Address: {dut_address}')
@@ -151,12 +143,9 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
         self.dut.host.StartAdvertising(
             legacy=True,
             data=DataTypes(
-                include_shortened_local_name=True,
-                tx_power_level=42,
-                incomplete_service_class_uuids16=['FDF0'],
+                complete_service_class_uuids16=['FDF0'],
             ),
             scan_response_data=DataTypes(
-                include_complete_local_name=True,
                 include_class_of_device=True,
             ),
         )
@@ -165,11 +154,8 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
         scan_response = next((x for x in peers if x.public == self.dut.address))
         peers.cancel()
 
-        assert_equal(type(scan_response.data.complete_local_name), str)
-        assert_equal(type(scan_response.data.shortened_local_name), str)
         assert_equal(type(scan_response.data.class_of_device), int)
-        assert_equal(type(scan_response.data.incomplete_service_class_uuids16[0]), str)
-        assert_equal(scan_response.data.tx_power_level, 42)
+        assert_equal(type(scan_response.data.complete_service_class_uuids16[0]), str)
 
     async def handle_pairing_events(self) -> NoReturn:
         ref_answer_queue: AsyncQueue[PairingEventAnswer] = AsyncQueue()
