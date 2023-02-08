@@ -29,7 +29,7 @@ from mobly.asserts import assert_is_none  # type: ignore
 from mobly.asserts import assert_is_not_none  # type: ignore
 from mobly.asserts import fail  # type: ignore
 from pandora.host_grpc import ConnectLERequestDict, DataTypes, DiscoverabilityMode, OwnAddressType
-from pandora.security_grpc import DeleteBondRequestDict, LESecurityLevel, PairingEventAnswer, SecurityLevel
+from pandora.security_grpc import LESecurityLevel, PairingEventAnswer, SecurityLevel
 from typing import NoReturn, Optional
 
 
@@ -217,8 +217,6 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
         # override reference device IO capability
         setattr(self.ref.device, 'io_capability', ref_io_capability)
 
-        await self.ref.aio.security_storage.DeleteBond(public=self.dut.address)
-
         pairing = asyncio.create_task(self.handle_pairing_events())
         (dut_ref_res, ref_dut_res) = await asyncio.gather(
             self.dut.aio.host.WaitConnection(address=self.ref.address),
@@ -263,13 +261,6 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
         # override reference device IO capability
         setattr(self.ref.device, 'io_capability', ref_io_capability)
 
-        ref_address: DeleteBondRequestDict
-        if ref_address_type in (OwnAddressType.PUBLIC, OwnAddressType.RESOLVABLE_OR_PUBLIC):
-            ref_address = {'public': self.ref.address}
-        else:
-            ref_address = {'random': self.ref.random_address}
-
-        await self.dut.aio.security_storage.DeleteBond(**ref_address)
         await self.dut.aio.host.StartAdvertising(
             legacy=True,
             connectable=True,
@@ -294,7 +285,7 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
 
         pairing = asyncio.create_task(self.handle_pairing_events())
         (dut_ref_res, ref_dut_res) = await asyncio.gather(
-            self.dut.aio.host.WaitLEConnection(**ref_address),
+            self.dut.aio.host.WaitLEConnection(),
             self.ref.aio.host.ConnectLE(**ref_dut_req),
         )
 
