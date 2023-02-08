@@ -17,7 +17,7 @@ import grpc
 import logging
 
 from avatar import PandoraDevices, parameterized
-from avatar.aio import AsyncQueue, asynchronous
+from avatar.aio import asynchronous
 from avatar.pandora_client import Address, BumblePandoraClient, PandoraClient
 from bumble.smp import PairingDelegate
 from concurrent import futures
@@ -158,31 +158,25 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
         assert_equal(type(scan_response.data.complete_service_class_uuids16[0]), str)
 
     async def handle_pairing_events(self) -> NoReturn:
-        ref_answer_queue: AsyncQueue[PairingEventAnswer] = AsyncQueue()
-        dut_answer_queue: AsyncQueue[PairingEventAnswer] = AsyncQueue()
-
-        on_ref_pairing = self.ref.aio.security.OnPairing(ref_answer_queue)
-        on_dut_pairing = self.dut.aio.security.OnPairing(dut_answer_queue)
+        ref_pairing_stream = self.ref.aio.security.OnPairing()
+        dut_pairing_stream = self.dut.aio.security.OnPairing()
 
         try:
-            on_ref_pairing_events = aiter(on_ref_pairing)
-            on_dut_pairing_events = aiter(on_dut_pairing)
-
             while True:
                 ref_pairing_event, dut_pairing_event = await asyncio.gather(
-                    anext(on_ref_pairing_events),
-                    anext(on_dut_pairing_events),
+                    anext(ref_pairing_stream),
+                    anext(dut_pairing_stream),
                 )
 
                 if dut_pairing_event.WhichOneof('method') in ('numeric_comparison', 'just_works'):
                     assert_in(ref_pairing_event.WhichOneof('method'), ('numeric_comparison', 'just_works'))
-                    dut_answer_queue.put_nowait(
+                    dut_pairing_stream.send_nowait(
                         PairingEventAnswer(
                             event=dut_pairing_event,
                             confirm=True,
                         )
                     )
-                    ref_answer_queue.put_nowait(
+                    ref_pairing_stream.send_nowait(
                         PairingEventAnswer(
                             event=ref_pairing_event,
                             confirm=True,
@@ -190,7 +184,7 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
                     )
                 elif dut_pairing_event.WhichOneof('method') == 'passkey_entry_notification':
                     assert_equal(ref_pairing_event.WhichOneof('method'), 'passkey_entry_request')
-                    ref_answer_queue.put_nowait(
+                    ref_pairing_stream.send_nowait(
                         PairingEventAnswer(
                             event=ref_pairing_event,
                             passkey=dut_pairing_event.passkey_entry_notification,
@@ -198,7 +192,7 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
                     )
                 elif dut_pairing_event.WhichOneof('method') == 'passkey_entry_request':
                     assert_equal(ref_pairing_event.WhichOneof('method'), 'passkey_entry_notification')
-                    dut_answer_queue.put_nowait(
+                    dut_pairing_stream.send_nowait(
                         PairingEventAnswer(
                             event=dut_pairing_event,
                             passkey=ref_pairing_event.passkey_entry_notification,
@@ -208,8 +202,8 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
                     fail("unreachable")
 
         finally:
-            on_ref_pairing.cancel()
-            on_dut_pairing.cancel()
+            ref_pairing_stream.cancel()
+            dut_pairing_stream.cancel()
 
     @parameterized(
         (PairingDelegate.NO_OUTPUT_NO_INPUT,),
@@ -285,7 +279,7 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
 
         dut = None
         peers = self.ref.aio.host.Scan(own_address_type=ref_address_type)
-        async for peer in aiter(peers):
+        async for peer in peers:
             if b'pause cafe' in peer.data.manufacturer_specific_data:
                 dut = peer
                 break

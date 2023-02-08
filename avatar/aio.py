@@ -16,23 +16,9 @@ import asyncio
 import functools
 import threading
 
-from typing import Any, AsyncIterator, Awaitable, Callable, Iterable, Iterator, TypeVar
+from typing import Any, Awaitable, Callable, TypeVar
 
 _T = TypeVar('_T')
-
-
-class AsyncQueue(asyncio.Queue[_T], Iterable[_T]):
-    def __aiter__(self) -> AsyncIterator[_T]:
-        return self
-
-    def __iter__(self) -> Iterator[_T]:
-        return self
-
-    async def __anext__(self) -> _T:
-        return await self.get()
-
-    def __next__(self) -> _T:
-        return run_until_complete(self.__anext__())
 
 
 # Keep running an event loop is a separate thread,
