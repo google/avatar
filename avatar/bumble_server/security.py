@@ -258,7 +258,7 @@ class SecurityService(SecurityServicer):
 
         assert request.level
         level = request.level
-        assert {BT_BR_EDR_TRANSPORT: 'classic', BT_LE_TRANSPORT: 'le'}[connection.transport] == request.level_variant
+        assert {BT_BR_EDR_TRANSPORT: 'classic', BT_LE_TRANSPORT: 'le'}[connection.transport] == request.level_variant()
 
         wait_for_security: asyncio.Future[str] = asyncio.get_running_loop().create_future()
         authenticate_task: Optional[asyncio.Future[None]] = None

@@ -361,7 +361,7 @@ class HostService(HostServicer):
         if request.target:
             # Need to reverse bytes order since Bumble Address is using MSB.
             target_bytes = bytes(reversed(request.target))
-            if request.target_variant == "public":
+            if request.target_variant() == "public":
                 target = Address(target_bytes, Address.PUBLIC_DEVICE_ADDRESS)
                 advertising_type = AdvertisingType.DIRECTED_CONNECTABLE_HIGH_DUTY  # FIXME: HIGH_DUTY ?
             else:
@@ -481,7 +481,7 @@ class HostService(HostServicer):
         self, request: GetRemoteNameRequest, context: grpc.ServicerContext
     ) -> GetRemoteNameResponse:
         remote: Union[Address, BumbleConnection]
-        if request.remote_variant == 'connection':
+        if request.remote_variant() == 'connection':
             assert request.connection
             connection_handle = int.from_bytes(request.connection.cookie.value, 'big')
             self.log.info(f"GetRemoteName: {connection_handle}")

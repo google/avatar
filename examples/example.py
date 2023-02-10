@@ -18,7 +18,7 @@ import logging
 
 from avatar import PandoraDevices, parameterized
 from avatar.aio import asynchronous
-from avatar.pandora_client import Address, BumblePandoraClient, PandoraClient
+from avatar.pandora_client import BumblePandoraClient, PandoraClient
 from bumble.smp import PairingDelegate
 from concurrent import futures
 from contextlib import suppress
@@ -28,7 +28,7 @@ from mobly.asserts import assert_in  # type: ignore
 from mobly.asserts import assert_is_none  # type: ignore
 from mobly.asserts import assert_is_not_none  # type: ignore
 from mobly.asserts import fail  # type: ignore
-from pandora.host_grpc import ConnectLERequestDict, DataTypes, DiscoverabilityMode, OwnAddressType
+from pandora.host_grpc import DataTypes, DiscoverabilityMode, OwnAddressType
 from pandora.security_grpc import LESecurityLevel, PairingEventAnswer, SecurityLevel
 from typing import NoReturn, Optional
 
@@ -168,8 +168,8 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
                     anext(dut_pairing_stream),
                 )
 
-                if dut_pairing_event.WhichOneof('method') in ('numeric_comparison', 'just_works'):
-                    assert_in(ref_pairing_event.WhichOneof('method'), ('numeric_comparison', 'just_works'))
+                if dut_pairing_event.method_variant() in ('numeric_comparison', 'just_works'):
+                    assert_in(ref_pairing_event.method_variant(), ('numeric_comparison', 'just_works'))
                     dut_pairing_stream.send_nowait(
                         PairingEventAnswer(
                             event=dut_pairing_event,
@@ -182,16 +182,16 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
                             confirm=True,
                         )
                     )
-                elif dut_pairing_event.WhichOneof('method') == 'passkey_entry_notification':
-                    assert_equal(ref_pairing_event.WhichOneof('method'), 'passkey_entry_request')
+                elif dut_pairing_event.method_variant() == 'passkey_entry_notification':
+                    assert_equal(ref_pairing_event.method_variant(), 'passkey_entry_request')
                     ref_pairing_stream.send_nowait(
                         PairingEventAnswer(
                             event=ref_pairing_event,
                             passkey=dut_pairing_event.passkey_entry_notification,
                         )
                     )
-                elif dut_pairing_event.WhichOneof('method') == 'passkey_entry_request':
-                    assert_equal(ref_pairing_event.WhichOneof('method'), 'passkey_entry_notification')
+                elif dut_pairing_event.method_variant() == 'passkey_entry_request':
+                    assert_equal(ref_pairing_event.method_variant(), 'passkey_entry_notification')
                     dut_pairing_stream.send_nowait(
                         PairingEventAnswer(
                             event=dut_pairing_event,
@@ -223,8 +223,8 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
             self.ref.aio.host.Connect(address=self.dut.address),
         )
 
-        assert_equal(ref_dut_res.WhichOneof('result'), 'connection')
-        assert_equal(dut_ref_res.WhichOneof('result'), 'connection')
+        assert_equal(ref_dut_res.result_variant(), 'connection')
+        assert_equal(dut_ref_res.result_variant(), 'connection')
         ref_dut = ref_dut_res.connection
         dut_ref = dut_ref_res.connection
         assert ref_dut and dut_ref
@@ -238,8 +238,8 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
         with suppress(asyncio.CancelledError, futures.CancelledError):
             await pairing
 
-        assert_equal(secure.WhichOneof('result'), 'success')
-        assert_equal(wait_security.WhichOneof('result'), 'success')
+        assert_equal(secure.result_variant(), 'success')
+        assert_equal(wait_security.result_variant(), 'success')
 
         await asyncio.gather(
             self.dut.aio.host.Disconnect(connection=dut_ref),
@@ -268,31 +268,18 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
             data=DataTypes(manufacturer_specific_data=b'pause cafe'),
         )
 
-        dut = None
         peers = self.ref.aio.host.Scan(own_address_type=ref_address_type)
-        async for peer in peers:
-            if b'pause cafe' in peer.data.manufacturer_specific_data:
-                dut = peer
-                break
+        dut = await anext((x async for x in peers if b'pause cafe' in x.data.manufacturer_specific_data))
         peers.cancel()
-        assert_is_not_none(dut)
         assert dut
-        assert dut.address_variant
-        assert dut.address
-
-        ref_dut_req = ConnectLERequestDict(own_address_type=ref_address_type)
-        ref_dut_req[dut.address_variant] = Address(dut.address)
 
         pairing = asyncio.create_task(self.handle_pairing_events())
         (dut_ref_res, ref_dut_res) = await asyncio.gather(
             self.dut.aio.host.WaitLEConnection(),
-            self.ref.aio.host.ConnectLE(**ref_dut_req),
+            self.ref.aio.host.ConnectLE(own_address_type=ref_address_type, **dut.address_asdict()),
         )
 
-        assert_equal(ref_dut_res.result_variant, 'connection')
-        assert_equal(dut_ref_res.result_variant, 'connection')
-        ref_dut = ref_dut_res.connection
-        dut_ref = dut_ref_res.connection
+        ref_dut, dut_ref = ref_dut_res.connection, dut_ref_res.connection
         assert ref_dut and dut_ref
 
         (secure, wait_security) = await asyncio.gather(
@@ -304,8 +291,8 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
         with suppress(asyncio.CancelledError, futures.CancelledError):
             await pairing
 
-        assert_equal(secure.WhichOneof('result'), 'success')
-        assert_equal(wait_security.WhichOneof('result'), 'success')
+        assert_equal(secure.result_variant(), 'success')
+        assert_equal(wait_security.result_variant(), 'success')
 
         await asyncio.gather(
             self.dut.aio.host.Disconnect(connection=dut_ref),
