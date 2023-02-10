@@ -20,13 +20,19 @@ import logging
 import struct
 
 from avatar.bumble_server.utils import BumbleServerLoggerAdapter, address_from_request
-from bumble.core import BT_BR_EDR_TRANSPORT, BT_LE_TRANSPORT, UUID, AdvertisingData, ConnectionError
+from bumble.core import (
+    BT_BR_EDR_TRANSPORT,
+    BT_LE_TRANSPORT,
+    BT_PERIPHERAL_ROLE,
+    UUID,
+    AdvertisingData,
+    ConnectionError,
+)
 from bumble.device import (
     DEVICE_DEFAULT_SCAN_INTERVAL,
     DEVICE_DEFAULT_SCAN_WINDOW,
     Advertisement,
     AdvertisingType,
-    Connection as BumbleConnection,
     Device,
 )
 from bumble.gatt import Service
@@ -35,10 +41,11 @@ from bumble.hci import (
     HCI_PAGE_TIMEOUT_ERROR,
     HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR,
     Address,
-    HCI_Error,
 )
 from google.protobuf import any_pb2, empty_pb2
 from pandora.host_grpc import (
+    AdvertiseRequest,
+    AdvertiseResponse,
     ConnectabilityMode,
     Connection,
     ConnectLERequest,
@@ -48,12 +55,6 @@ from pandora.host_grpc import (
     DataTypes,
     DisconnectRequest,
     DiscoverabilityMode,
-    GetConnectionRequest,
-    GetConnectionResponse,
-    GetLEConnectionRequest,
-    GetLEConnectionResponse,
-    GetRemoteNameRequest,
-    GetRemoteNameResponse,
     InquiryResponse,
     PrimaryPhy,
     ReadLocalAddressResponse,
@@ -62,17 +63,12 @@ from pandora.host_grpc import (
     SecondaryPhy,
     SetConnectabilityModeRequest,
     SetDiscoverabilityModeRequest,
-    StartAdvertisingRequest,
-    StartAdvertisingResponse,
-    StopAdvertisingRequest,
     WaitConnectionRequest,
     WaitConnectionResponse,
     WaitDisconnectionRequest,
-    WaitLEConnectionRequest,
-    WaitLEConnectionResponse,
 )
 from pandora.host_grpc_aio import HostServicer
-from typing import AsyncGenerator, Dict, List, Optional, Tuple, Union, cast
+from typing import AsyncGenerator, Dict, List, Optional, Set, Tuple, cast
 
 PRIMARY_PHY_MAP: Dict[int, PrimaryPhy] = {1: PrimaryPhy.PRIMARY_1M, 3: PrimaryPhy.PRIMARY_CODED}
 
@@ -89,6 +85,7 @@ class HostService(HostServicer):
     device: Device
     scan_queue: asyncio.Queue[Advertisement]
     inquiry_queue: asyncio.Queue[Optional[Tuple[Address, int, AdvertisingData, int]]]
+    waited_connections: Set[int]
 
     def __init__(self, grpc_server: grpc.aio.Server, device: Device) -> None:
         super().__init__()
@@ -97,6 +94,7 @@ class HostService(HostServicer):
         self.device = device
         self.scan_queue = asyncio.Queue()
         self.inquiry_queue = asyncio.Queue()
+        self.waited_connections = set()
 
     async def FactoryReset(self, request: empty_pb2.Empty, context: grpc.ServicerContext) -> empty_pb2.Empty:
         self.log.info('FactoryReset')
@@ -112,6 +110,11 @@ class HostService(HostServicer):
     async def Reset(self, request: empty_pb2.Empty, context: grpc.ServicerContext) -> empty_pb2.Empty:
         self.log.info('Reset')
 
+        # clear service.
+        self.waited_connections.clear()
+        self.scan_queue = asyncio.Queue()
+        self.inquiry_queue = asyncio.Queue()
+
         # (re) power device on
         await self.device.power_on()
         return empty_pb2.Empty()
@@ -125,12 +128,10 @@ class HostService(HostServicer):
     async def Connect(self, request: ConnectRequest, context: grpc.ServicerContext) -> ConnectResponse:
         # Need to reverse bytes order since Bumble Address is using MSB.
         address = Address(bytes(reversed(request.address)), address_type=Address.PUBLIC_DEVICE_ADDRESS)
-        self.log.info(f"Connect: {address}")
+        self.log.info(f"Connect to {address}")
 
         try:
-            self.log.info("Connecting...")
             connection = await self.device.connect(address, transport=BT_BR_EDR_TRANSPORT)
-            self.log.info("Connected")
         except ConnectionError as e:
             if e.error_code == HCI_PAGE_TIMEOUT_ERROR:
                 self.log.warning(f"Peer not found: {e}")
@@ -140,56 +141,54 @@ class HostService(HostServicer):
                 return ConnectResponse(connection_already_exists=empty_pb2.Empty())
             raise e
 
-        self.log.info(f"Connect: connection handle: {connection.handle}")
+        self.log.info(f"Connect to {address} done (handle={connection.handle})")
+
         cookie = any_pb2.Any(value=connection.handle.to_bytes(4, 'big'))
         return ConnectResponse(connection=Connection(cookie=cookie))
-
-    async def GetConnection(
-        self, request: GetConnectionRequest, context: grpc.ServicerContext
-    ) -> GetConnectionResponse:
-        # Need to reverse bytes order since Bumble Address is using MSB.
-        address = Address(bytes(reversed(request.address)))
-        self.log.info(f"GetConnection: {address}")
-
-        if not (connection := self.device.find_connection_by_bd_addr(address, transport=BT_BR_EDR_TRANSPORT)):
-            return GetConnectionResponse(peer_not_found=empty_pb2.Empty())
-
-        cookie = any_pb2.Any(value=connection.handle.to_bytes(4, 'big'))
-        return GetConnectionResponse(connection=Connection(cookie=cookie))
 
     async def WaitConnection(
         self, request: WaitConnectionRequest, context: grpc.ServicerContext
     ) -> WaitConnectionResponse:
+        if not request.address:
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)  # type: ignore
+            raise ValueError('Request address field must be set')
+
         # Need to reverse bytes order since Bumble Address is using MSB.
-        if request.address:
-            address = Address(bytes(reversed(request.address)), address_type=Address.PUBLIC_DEVICE_ADDRESS)
-            self.log.info(f"WaitConnection: {address}")
+        address = Address(bytes(reversed(request.address)), address_type=Address.PUBLIC_DEVICE_ADDRESS)
+        if address in (Address.NIL, Address.ANY):
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)  # type: ignore
+            raise ValueError('Invalid address')
 
-            if connection := self.device.find_connection_by_bd_addr(address, transport=BT_BR_EDR_TRANSPORT):
-                cookie = any_pb2.Any(value=connection.handle.to_bytes(4, 'big'))
-                return WaitConnectionResponse(connection=Connection(cookie=cookie))
-        else:
-            address = Address.ANY
-            self.log.info(f"WaitConnection: {address}")
+        self.log.info(f"WaitConnection from {address}...")
 
-        self.log.info("Wait connection...")
-        connection = await self.device.accept(address)
-        self.log.info("Connected")
+        connection = self.device.find_connection_by_bd_addr(address, transport=BT_BR_EDR_TRANSPORT)
+        if connection and id(connection) in self.waited_connections:
+            # this connection was already returned: wait for a new one.
+            connection = None
 
-        self.log.info(f"WaitConnection: connection handle: {connection.handle}")
+        if not connection:
+            connection = await self.device.accept(address)
+
+        # save connection has waited and respond.
+        self.waited_connections.add(id(connection))
+
+        self.log.info(f"WaitConnection from {address} done (handle={connection.handle})")
+
         cookie = any_pb2.Any(value=connection.handle.to_bytes(4, 'big'))
         return WaitConnectionResponse(connection=Connection(cookie=cookie))
 
     async def ConnectLE(self, request: ConnectLERequest, context: grpc.ServicerContext) -> ConnectLEResponse:
         address = address_from_request(request, request.WhichOneof("address"))
-        self.log.info(f"ConnectLE: {address}")
+        if address in (Address.NIL, Address.ANY):
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)  # type: ignore
+            raise ValueError('Invalid address')
+
+        self.log.info(f"ConnectLE to {address}...")
 
         try:
-            self.log.info("Connecting...")
-            connection: BumbleConnection = await self.device.connect(
+            connection = await self.device.connect(
                 address, transport=BT_LE_TRANSPORT, own_address_type=request.own_address_type
             )
-            self.log.info("Connected")
         except ConnectionError as e:
             if e.error_code == HCI_PAGE_TIMEOUT_ERROR:
                 self.log.warning(f"Peer not found: {e}")
@@ -197,77 +196,13 @@ class HostService(HostServicer):
             if e.error_code == HCI_CONNECTION_ALREADY_EXISTS_ERROR:
                 self.log.warning(f"Connection already exists: {e}")
                 return ConnectLEResponse(connection_already_exists=empty_pb2.Empty())
+            context.set_code(grpc.StatusCode.ABORTED)  # type: ignore
             raise e
 
-        self.log.info(f"ConnectLE: connection handle: {connection.handle}")
+        self.log.info(f"ConnectLE to {address} done (handle={connection.handle})")
+
         cookie = any_pb2.Any(value=connection.handle.to_bytes(4, 'big'))
         return ConnectLEResponse(connection=Connection(cookie=cookie))
-
-    async def GetLEConnection(
-        self, request: GetLEConnectionRequest, context: grpc.ServicerContext
-    ) -> GetLEConnectionResponse:
-        address = address_from_request(request, request.WhichOneof("address"))
-        self.log.info(f"GetLEConnection: {address}")
-
-        connection = self.device.find_connection_by_bd_addr(
-            address, transport=BT_LE_TRANSPORT, check_address_type=True
-        )
-
-        if not connection:
-            return GetLEConnectionResponse(peer_not_found=empty_pb2.Empty())
-
-        cookie = any_pb2.Any(value=connection.handle.to_bytes(4, 'big'))
-        return GetLEConnectionResponse(connection=Connection(cookie=cookie))
-
-    async def WaitLEConnection(
-        self, request: WaitLEConnectionRequest, context: grpc.ServicerContext
-    ) -> WaitLEConnectionResponse:
-        if request.address:
-            address = address_from_request(request, request.WhichOneof("address"))
-        else:
-            address = Address.ANY
-
-        self.log.info(f"WaitLEConnection: {address}")
-
-        if address != Address.ANY:
-            if conn := self.device.find_connection_by_bd_addr(
-                address, transport=BT_LE_TRANSPORT, check_address_type=True
-            ):
-                cookie = any_pb2.Any(value=conn.handle.to_bytes(4, 'big'))
-                return WaitLEConnectionResponse(connection=Connection(cookie=cookie))
-
-        pending_connection: asyncio.Future[bumble.device.Connection] = asyncio.get_running_loop().create_future()
-
-        if address != Address.ANY:
-
-            def on_connection(connection: bumble.device.Connection) -> None:
-                if connection.transport == BT_LE_TRANSPORT and connection.peer_address == address:
-                    pending_connection.set_result(connection)
-
-            def on_connection_failure(error: ConnectionError) -> None:
-                if connection.transport == BT_LE_TRANSPORT and connection.peer_address == address:
-                    pending_connection.set_exception(error)
-
-        else:
-
-            def on_connection(connection: bumble.device.Connection) -> None:
-                if connection.transport == BT_LE_TRANSPORT:
-                    pending_connection.set_result(connection)
-
-            def on_connection_failure(error: ConnectionError) -> None:
-                if connection.transport == BT_LE_TRANSPORT:
-                    pending_connection.set_exception(error)
-
-        self.device.on('connection', on_connection)
-        self.device.on('connection_failure', on_connection_failure)
-
-        try:
-            connection = await pending_connection
-            cookie = any_pb2.Any(value=connection.handle.to_bytes(4, 'big'))
-            return WaitLEConnectionResponse(connection=Connection(cookie=cookie))
-        finally:
-            self.device.remove_listener('connection', on_connection)  # type: ignore
-            self.device.remove_listener('connection_failure', on_connection_failure)  # type: ignore
 
     async def Disconnect(self, request: DisconnectRequest, context: grpc.ServicerContext) -> empty_pb2.Empty:
         connection_handle = int.from_bytes(request.connection.cookie.value, 'big')
@@ -298,10 +233,9 @@ class HostService(HostServicer):
 
         return empty_pb2.Empty()
 
-    # TODO: use advertising set commands
-    async def StartAdvertising(
-        self, request: StartAdvertisingRequest, context: grpc.ServicerContext
-    ) -> StartAdvertisingResponse:
+    async def Advertise(
+        self, request: AdvertiseRequest, context: grpc.ServicerContext
+    ) -> AsyncGenerator[AdvertiseResponse, None]:
         # TODO: add support for extended advertising in Bumble
         # TODO: add support for `request.interval`
         # TODO: add support for `request.interval_range`
@@ -313,7 +247,10 @@ class HostService(HostServicer):
         assert not request.primary_phy
         assert not request.secondary_phy
 
-        self.log.info('StartAdvertising')
+        if self.device.is_advertising:
+            # TODO: add support for advertising sets.
+            context.set_code(grpc.StatusCode.ABORTED)  # type: ignore
+            raise RuntimeError('Advertising sets are not yet supported, only one `Advertise` is possible at a time')
 
         if data := request.data:
             self.device.advertising_data = bytes(self.unpack_data_types(data))
@@ -368,18 +305,46 @@ class HostService(HostServicer):
                 target = Address(target_bytes, Address.RANDOM_DEVICE_ADDRESS)
                 advertising_type = AdvertisingType.DIRECTED_CONNECTABLE_HIGH_DUTY  # FIXME: HIGH_DUTY ?
 
-        await self.device.start_advertising(
-            target=target, advertising_type=advertising_type, own_address_type=request.own_address_type
-        )
+        if request.connectable:
 
-        # FIXME: wait for advertising sets to have a correct set, use `None` for now
-        return StartAdvertisingResponse()
+            def on_connection(connection: bumble.device.Connection) -> None:
+                if connection.transport == BT_LE_TRANSPORT and connection.role == BT_PERIPHERAL_ROLE:
+                    pending_connection.set_result(connection)
 
-    # TODO: use advertising set commands
-    async def StopAdvertising(self, request: StopAdvertisingRequest, context: grpc.ServicerContext) -> empty_pb2.Empty:
-        self.log.info('StopAdvertising')
-        await self.device.stop_advertising()
-        return empty_pb2.Empty()
+            self.device.on('connection', on_connection)
+
+        try:
+            while True:
+                if not self.device.is_advertising:
+                    self.log.info('Advertise')
+                    await self.device.start_advertising(
+                        target=target, advertising_type=advertising_type, own_address_type=request.own_address_type
+                    )
+
+                if not request.connectable:
+                    await asyncio.sleep(1)
+                    continue
+
+                pending_connection: asyncio.Future[
+                    bumble.device.Connection
+                ] = asyncio.get_running_loop().create_future()
+
+                self.log.info('Wait for LE connection...')
+                connection = await pending_connection
+
+                self.log.info(f"Advertise: Connected to {connection.peer_address} (handle={connection.handle})")
+
+                cookie = any_pb2.Any(value=connection.handle.to_bytes(4, 'big'))
+                yield AdvertiseResponse(connection=Connection(cookie=cookie))
+
+                # wait a small delay before restarting the advertisement.
+                await asyncio.sleep(1)
+        finally:
+            if request.connectable:
+                self.device.remove_listener('connection', on_connection)  # type: ignore
+
+            self.log.info('Stop advertising')
+            await self.device.abort_on('flush', self.device.stop_advertising())
 
     async def Scan(
         self, request: ScanRequest, context: grpc.ServicerContext
@@ -476,34 +441,6 @@ class HostService(HostServicer):
         self.log.info("SetConnectabilityMode")
         await self.device.set_connectable(request.mode != ConnectabilityMode.NOT_CONNECTABLE)
         return empty_pb2.Empty()
-
-    async def GetRemoteName(
-        self, request: GetRemoteNameRequest, context: grpc.ServicerContext
-    ) -> GetRemoteNameResponse:
-        remote: Union[Address, BumbleConnection]
-        if request.remote_variant() == 'connection':
-            assert request.connection
-            connection_handle = int.from_bytes(request.connection.cookie.value, 'big')
-            self.log.info(f"GetRemoteName: {connection_handle}")
-
-            connection = self.device.lookup_connection(connection_handle)
-            assert connection
-            remote = connection
-        else:
-            # Need to reverse bytes order since Bumble Address is using MSB.
-            assert request.address
-            remote = Address(bytes(reversed(request.address)), address_type=Address.PUBLIC_DEVICE_ADDRESS)
-            self.log.info(f"GetRemoteName: {remote}")
-
-        try:
-            assert remote
-            remote_name = await self.device.request_remote_name(remote)
-            return GetRemoteNameResponse(name=remote_name)
-        except HCI_Error as e:
-            if e.error_code == HCI_PAGE_TIMEOUT_ERROR:
-                self.log.warning(f"Peer not found: {e}")
-                return GetRemoteNameResponse(remote_not_found=empty_pb2.Empty())
-            raise e
 
     def unpack_data_types(self, dt: DataTypes) -> AdvertisingData:
         ad_structures: List[Tuple[int, bytes]] = []

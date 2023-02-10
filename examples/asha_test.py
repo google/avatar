@@ -53,16 +53,20 @@ class ASHATest(base_test.BaseTestClass):  # type: ignore[misc]
 
         self.ref.asha.Register(capability=capability, hisyncid=hisyncid)
 
-        self.ref.host.StartAdvertising(
+        advertisement = self.ref.host.Advertise(
             legacy=True,
             data=DataTypes(
                 complete_local_name=complete_local_name, incomplete_service_class_uuids16=[ASHATest.ASHA_UUID]
             ),
         )
-        peers = self.dut.host.Scan()
+        scan = self.dut.host.Scan()
 
-        scan_result = next((x for x in peers if x.data.complete_local_name == complete_local_name))
+        scan_result = next((x for x in scan if x.data.complete_local_name == complete_local_name))
         logging.debug(f"scan_response.data: {scan_result}")
+
+        advertisement.cancel()
+        scan.cancel()
+
         assert_in(ASHATest.ASHA_UUID, scan_result.data.service_data_uuid16)
         assert_equal(type(scan_result.data.complete_local_name), str)
         expected_advertisement_data = (
@@ -81,16 +85,20 @@ class ASHATest(base_test.BaseTestClass):  # type: ignore[misc]
 
         self.ref.asha.Register(capability=capability, hisyncid=hisyncid)
 
-        self.ref.host.StartAdvertising(
+        advertisement = self.ref.host.Advertise(
             legacy=True,
             scan_response_data=DataTypes(
                 complete_local_name=complete_local_name, incomplete_service_class_uuids16=[ASHATest.ASHA_UUID]
             ),
         )
-        peers = self.dut.host.Scan()
+        scan = self.dut.host.Scan()
 
-        scan_response = next((x for x in peers if x.data.complete_local_name == complete_local_name))
+        scan_response = next((x for x in scan if x.data.complete_local_name == complete_local_name))
         logging.debug(f"scan_response.data: {scan_response}")
+
+        advertisement.cancel()
+        scan.cancel()
+
         assert_in(ASHATest.ASHA_UUID, scan_response.data.service_data_uuid16)
         expected_advertisement_data = (
             "{:02x}".format(protocol_version)

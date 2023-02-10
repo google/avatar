@@ -65,8 +65,7 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
         self.dut.log.info(f'Address: {dut_address}')
         connection = self.ref.host.Connect(address=dut_address).connection
         assert connection
-        dut_name = self.ref.host.GetRemoteName(connection=connection).name
-        self.ref.log.info(f'Connected with: "{dut_name}" {dut_address}')
+        self.ref.log.info(f'Connected with: {dut_address}')
         self.ref.host.Disconnect(connection=connection)
 
     # Using this decorator allow us to write one `test_le_connect`, and
@@ -78,34 +77,36 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
         (OwnAddressType.RANDOM, OwnAddressType.PUBLIC),
     )  # type: ignore[misc]
     def test_le_connect(self, dut_address_type: OwnAddressType, ref_address_type: OwnAddressType) -> None:
-        self.ref.host.StartAdvertising(legacy=True, connectable=True, own_address_type=ref_address_type)
-        peers = self.dut.host.Scan(own_address_type=dut_address_type)
+        advertisement = self.ref.host.Advertise(legacy=True, connectable=True, own_address_type=ref_address_type)
+        scan = self.dut.host.Scan(own_address_type=dut_address_type)
         if ref_address_type == OwnAddressType.PUBLIC:
-            scan_response = next((x for x in peers if x.public == self.ref.address))
+            scan_response = next((x for x in scan if x.public == self.ref.address))
             dut_ref = self.dut.host.ConnectLE(
                 public=scan_response.public,
                 own_address_type=dut_address_type,
             ).connection
         else:
-            scan_response = next((x for x in peers if x.random == self.ref.random_address))
+            scan_response = next((x for x in scan if x.random == self.ref.random_address))
             dut_ref = self.dut.host.ConnectLE(
                 random=scan_response.random,
                 own_address_type=dut_address_type,
             ).connection
-        peers.cancel()
-        assert dut_ref
+        scan.cancel()
+        ref_dut = next(advertisement).connection
+        advertisement.cancel()
+        assert dut_ref and ref_dut
         self.dut.host.Disconnect(connection=dut_ref)
 
     def test_not_discoverable(self) -> None:
         self.dut.host.SetDiscoverabilityMode(mode=DiscoverabilityMode.NOT_DISCOVERABLE)
-        peers = self.ref.host.Inquiry(timeout=3.0)
+        inquiry = self.ref.host.Inquiry(timeout=3.0)
         try:
-            assert_is_none(next((x for x in peers if x.address == self.dut.address), None))
+            assert_is_none(next((x for x in inquiry if x.address == self.dut.address), None))
         except grpc.RpcError as e:
             # No peers found; StartInquiry times out
             assert_equal(e.code(), grpc.StatusCode.DEADLINE_EXCEEDED)  # type: ignore
         finally:
-            peers.cancel()
+            inquiry.cancel()
 
     @parameterized(
         (DiscoverabilityMode.DISCOVERABLE_LIMITED,),
@@ -113,11 +114,11 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
     )  # type: ignore[misc]
     def test_discoverable(self, mode: DiscoverabilityMode) -> None:
         self.dut.host.SetDiscoverabilityMode(mode=mode)
-        peers = self.ref.host.Inquiry(timeout=15.0)
+        inquiry = self.ref.host.Inquiry(timeout=15.0)
         try:
-            assert_is_not_none(next((x for x in peers if x.address == self.dut.address), None))
+            assert_is_not_none(next((x for x in inquiry if x.address == self.dut.address), None))
         finally:
-            peers.cancel()
+            inquiry.cancel()
 
     @asynchronous
     async def test_wait_connection(self) -> None:
@@ -129,18 +130,8 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
         assert ref_dut.connection
         await self.ref.aio.host.Disconnect(connection=ref_dut.connection)
 
-    @asynchronous
-    async def test_wait_any_connection(self) -> None:
-        dut_ref_co = self.dut.aio.host.WaitConnection()
-        ref_dut = await self.ref.aio.host.Connect(address=self.dut.address)
-        dut_ref = await dut_ref_co
-        assert_is_not_none(ref_dut.connection)
-        assert_is_not_none(dut_ref.connection)
-        assert ref_dut.connection
-        await self.ref.aio.host.Disconnect(connection=ref_dut.connection)
-
     def test_scan_response_data(self) -> None:
-        self.dut.host.StartAdvertising(
+        advertisement = self.dut.host.Advertise(
             legacy=True,
             data=DataTypes(
                 complete_service_class_uuids16=['FDF0'],
@@ -150,9 +141,11 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
             ),
         )
 
-        peers = self.ref.host.Scan()
-        scan_response = next((x for x in peers if x.public == self.dut.address))
-        peers.cancel()
+        scan = self.ref.host.Scan()
+        scan_response = next((x for x in scan if x.public == self.dut.address))
+
+        scan.cancel()
+        advertisement.cancel()
 
         assert_equal(type(scan_response.data.class_of_device), int)
         assert_equal(type(scan_response.data.complete_service_class_uuids16[0]), str)
@@ -261,24 +254,25 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
         # override reference device IO capability
         setattr(self.ref.device, 'io_capability', ref_io_capability)
 
-        await self.dut.aio.host.StartAdvertising(
+        advertisement = self.dut.aio.host.Advertise(
             legacy=True,
             connectable=True,
             own_address_type=dut_address_type,
             data=DataTypes(manufacturer_specific_data=b'pause cafe'),
         )
 
-        peers = self.ref.aio.host.Scan(own_address_type=ref_address_type)
-        dut = await anext((x async for x in peers if b'pause cafe' in x.data.manufacturer_specific_data))
-        peers.cancel()
+        scan = self.ref.aio.host.Scan(own_address_type=ref_address_type)
+        dut = await anext((x async for x in scan if b'pause cafe' in x.data.manufacturer_specific_data))
+        scan.cancel()
         assert dut
 
         pairing = asyncio.create_task(self.handle_pairing_events())
-        (dut_ref_res, ref_dut_res) = await asyncio.gather(
-            self.dut.aio.host.WaitLEConnection(),
+        (ref_dut_res, dut_ref_res) = await asyncio.gather(
             self.ref.aio.host.ConnectLE(own_address_type=ref_address_type, **dut.address_asdict()),
+            anext(aiter(advertisement)),
         )
 
+        advertisement.cancel()
         ref_dut, dut_ref = ref_dut_res.connection, dut_ref_res.connection
         assert ref_dut and dut_ref
 

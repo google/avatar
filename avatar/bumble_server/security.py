@@ -18,7 +18,7 @@ import logging
 
 from avatar.bumble_server.utils import BumbleServerLoggerAdapter, address_from_request
 from bumble import hci
-from bumble.core import ProtocolError, BT_BR_EDR_TRANSPORT, BT_LE_TRANSPORT
+from bumble.core import BT_BR_EDR_TRANSPORT, BT_LE_TRANSPORT, ProtocolError
 from bumble.device import Connection as BumbleConnection, Device
 from bumble.hci import HCI_Error
 from bumble.smp import PairingConfig, PairingDelegate as BasePairingDelegate
