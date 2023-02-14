@@ -33,7 +33,10 @@ from dataclasses import dataclass
 from pandora.asha_grpc_aio import add_ASHAServicer_to_server
 from pandora.host_grpc_aio import add_HostServicer_to_server
 from pandora.security_grpc_aio import add_SecurityServicer_to_server, add_SecurityStorageServicer_to_server
-from typing import Coroutine, Optional
+from typing import Callable, Coroutine, List, Optional
+
+# Add servicers hooks.
+_SERVICERS_HOOKS: List[Callable[['Server'], None]] = []
 
 
 @dataclass
@@ -56,6 +59,10 @@ class Server:
         add_SecurityServicer_to_server(SecurityService(device, self.config.io_capability), self.server)
         add_SecurityStorageServicer_to_server(SecurityStorageService(device), self.server)
         add_ASHAServicer_to_server(ASHAService(device), self.server)
+
+        # call hooks if any.
+        for hook in _SERVICERS_HOOKS:
+            hook(self)
 
         try:
             # open device.
@@ -93,6 +100,10 @@ class Server:
         finally:
             # stop server.
             await self.server.stop(None)
+
+
+def register_servicer_hook(hook: Callable[['Server'], None]) -> None:
+    _SERVICERS_HOOKS.append(hook)
 
 
 def serve_bumble(
