@@ -18,7 +18,7 @@ import logging
 
 from avatar.bumble_server.utils import BumbleServerLoggerAdapter, address_from_request
 from bumble import hci
-from bumble.core import BT_BR_EDR_TRANSPORT, BT_LE_TRANSPORT
+from bumble.core import ProtocolError, BT_BR_EDR_TRANSPORT, BT_LE_TRANSPORT
 from bumble.device import Connection as BumbleConnection, Device
 from bumble.hci import HCI_Error
 from bumble.smp import PairingConfig, PairingDelegate as BasePairingDelegate
@@ -214,7 +214,7 @@ class SecurityService(SecurityServicer):
             except asyncio.CancelledError:
                 self.log.warning(f"Connection died during encryption")
                 return SecureResponse(connection_died=empty_pb2.Empty())
-            except HCI_Error as e:
+            except (HCI_Error, ProtocolError) as e:
                 self.log.warning(f"Pairing failure: {e}")
                 return SecureResponse(pairing_failure=empty_pb2.Empty())
 
@@ -227,7 +227,7 @@ class SecurityService(SecurityServicer):
             except asyncio.CancelledError:
                 self.log.warning(f"Connection died during authentication")
                 return SecureResponse(connection_died=empty_pb2.Empty())
-            except HCI_Error as e:
+            except (HCI_Error, ProtocolError) as e:
                 self.log.warning(f"Authentication failure: {e}")
                 return SecureResponse(authentication_failure=empty_pb2.Empty())
 
@@ -240,7 +240,7 @@ class SecurityService(SecurityServicer):
             except asyncio.CancelledError:
                 self.log.warning(f"Connection died during encryption")
                 return SecureResponse(connection_died=empty_pb2.Empty())
-            except HCI_Error as e:
+            except (HCI_Error, ProtocolError) as e:
                 self.log.warning(f"Encryption failure: {e}")
                 return SecureResponse(encryption_failure=empty_pb2.Empty())
 
