@@ -28,8 +28,17 @@ from mobly.asserts import assert_in  # type: ignore
 from mobly.asserts import assert_is_none  # type: ignore
 from mobly.asserts import assert_is_not_none  # type: ignore
 from mobly.asserts import fail  # type: ignore
-from pandora.host_grpc import DataTypes, DiscoverabilityMode, OwnAddressType
-from pandora.security_grpc import LESecurityLevel, PairingEventAnswer, SecurityLevel
+from pandora.host_pb2 import (
+    DISCOVERABLE_GENERAL,
+    DISCOVERABLE_LIMITED,
+    NOT_DISCOVERABLE,
+    PUBLIC,
+    RANDOM,
+    DataTypes,
+    DiscoverabilityMode,
+    OwnAddressType,
+)
+from pandora.security_pb2 import LE_LEVEL3, LEVEL2, PairingEventAnswer
 from typing import NoReturn, Optional
 
 
@@ -73,13 +82,13 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
     # Here we check that no matter the address type we use for both sides
     # the connection still complete.
     @parameterized(
-        (OwnAddressType.RANDOM, OwnAddressType.RANDOM),
-        (OwnAddressType.RANDOM, OwnAddressType.PUBLIC),
+        (RANDOM, RANDOM),
+        (RANDOM, PUBLIC),
     )  # type: ignore[misc]
     def test_le_connect(self, dut_address_type: OwnAddressType, ref_address_type: OwnAddressType) -> None:
         advertisement = self.ref.host.Advertise(legacy=True, connectable=True, own_address_type=ref_address_type)
         scan = self.dut.host.Scan(own_address_type=dut_address_type)
-        if ref_address_type == OwnAddressType.PUBLIC:
+        if ref_address_type == PUBLIC:
             scan_response = next((x for x in scan if x.public == self.ref.address))
             dut_ref = self.dut.host.ConnectLE(
                 public=scan_response.public,
@@ -98,7 +107,7 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
         self.dut.host.Disconnect(connection=dut_ref)
 
     def test_not_discoverable(self) -> None:
-        self.dut.host.SetDiscoverabilityMode(mode=DiscoverabilityMode.NOT_DISCOVERABLE)
+        self.dut.host.SetDiscoverabilityMode(mode=NOT_DISCOVERABLE)
         inquiry = self.ref.host.Inquiry(timeout=3.0)
         try:
             assert_is_none(next((x for x in inquiry if x.address == self.dut.address), None))
@@ -109,8 +118,8 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
             inquiry.cancel()
 
     @parameterized(
-        (DiscoverabilityMode.DISCOVERABLE_LIMITED,),
-        (DiscoverabilityMode.DISCOVERABLE_GENERAL,),
+        (DISCOVERABLE_LIMITED,),
+        (DISCOVERABLE_GENERAL,),
     )  # type: ignore[misc]
     def test_discoverable(self, mode: DiscoverabilityMode) -> None:
         self.dut.host.SetDiscoverabilityMode(mode=mode)
@@ -223,8 +232,8 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
         assert ref_dut and dut_ref
 
         (secure, wait_security) = await asyncio.gather(
-            self.ref.aio.security.Secure(connection=ref_dut, classic=SecurityLevel.LEVEL2),
-            self.dut.aio.security.WaitSecurity(connection=dut_ref, classic=SecurityLevel.LEVEL2),
+            self.ref.aio.security.Secure(connection=ref_dut, classic=LEVEL2),
+            self.dut.aio.security.WaitSecurity(connection=dut_ref, classic=LEVEL2),
         )
 
         pairing.cancel()
@@ -240,12 +249,12 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
         )
 
     @parameterized(
-        (OwnAddressType.RANDOM, OwnAddressType.RANDOM, PairingDelegate.NO_OUTPUT_NO_INPUT),
-        (OwnAddressType.RANDOM, OwnAddressType.RANDOM, PairingDelegate.KEYBOARD_INPUT_ONLY),
-        (OwnAddressType.RANDOM, OwnAddressType.RANDOM, PairingDelegate.DISPLAY_OUTPUT_ONLY),
-        (OwnAddressType.RANDOM, OwnAddressType.RANDOM, PairingDelegate.DISPLAY_OUTPUT_AND_YES_NO_INPUT),
-        (OwnAddressType.RANDOM, OwnAddressType.RANDOM, PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT),
-        (OwnAddressType.RANDOM, OwnAddressType.PUBLIC, PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT),
+        (RANDOM, RANDOM, PairingDelegate.NO_OUTPUT_NO_INPUT),
+        (RANDOM, RANDOM, PairingDelegate.KEYBOARD_INPUT_ONLY),
+        (RANDOM, RANDOM, PairingDelegate.DISPLAY_OUTPUT_ONLY),
+        (RANDOM, RANDOM, PairingDelegate.DISPLAY_OUTPUT_AND_YES_NO_INPUT),
+        (RANDOM, RANDOM, PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT),
+        (RANDOM, PUBLIC, PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT),
     )  # type: ignore[misc]
     @asynchronous
     async def test_le_pairing(
@@ -277,8 +286,8 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
         assert ref_dut and dut_ref
 
         (secure, wait_security) = await asyncio.gather(
-            self.ref.aio.security.Secure(connection=ref_dut, le=LESecurityLevel.LE_LEVEL3),
-            self.dut.aio.security.WaitSecurity(connection=dut_ref, le=LESecurityLevel.LE_LEVEL3),
+            self.ref.aio.security.Secure(connection=ref_dut, le=LE_LEVEL3),
+            self.dut.aio.security.WaitSecurity(connection=dut_ref, le=LE_LEVEL3),
         )
 
         pairing.cancel()

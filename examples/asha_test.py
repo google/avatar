@@ -22,7 +22,7 @@ from bumble.gatt import GATT_ASHA_SERVICE
 from mobly import base_test, test_runner
 from mobly.asserts import assert_equal  # type: ignore
 from mobly.asserts import assert_in  # type: ignore
-from pandora.host_grpc import DataTypes
+from pandora.host_pb2 import DataTypes
 
 
 class ASHATest(base_test.BaseTestClass):  # type: ignore[misc]

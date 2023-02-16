@@ -25,8 +25,18 @@ from bumble.smp import PairingConfig, PairingDelegate as BasePairingDelegate
 from contextlib import suppress
 from google.protobuf import any_pb2, empty_pb2, wrappers_pb2
 from google.protobuf.wrappers_pb2 import BoolValue
-from pandora.host_grpc import Connection
-from pandora.security_grpc import (
+from pandora.host_pb2 import Connection
+from pandora.security_grpc_aio import SecurityServicer, SecurityStorageServicer
+from pandora.security_pb2 import (
+    LE_LEVEL1,
+    LE_LEVEL2,
+    LE_LEVEL3,
+    LE_LEVEL4,
+    LEVEL0,
+    LEVEL1,
+    LEVEL2,
+    LEVEL3,
+    LEVEL4,
     DeleteBondRequest,
     IsBondedRequest,
     LESecurityLevel,
@@ -38,7 +48,6 @@ from pandora.security_grpc import (
     WaitSecurityRequest,
     WaitSecurityResponse,
 )
-from pandora.security_grpc_aio import SecurityServicer, SecurityStorageServicer
 from typing import Any, AsyncGenerator, AsyncIterator, Callable, Dict, Optional, Union, cast
 
 
@@ -123,28 +132,26 @@ class PairingDelegate(BasePairingDelegate):
 
 
 BR_LEVEL_REACHED: Dict[SecurityLevel, Callable[[BumbleConnection], bool]] = {
-    SecurityLevel.LEVEL0: lambda connection: True,
-    SecurityLevel.LEVEL1: lambda connection: connection.encryption == 0 or connection.authenticated,
-    SecurityLevel.LEVEL2: lambda connection: connection.encryption != 0 and connection.authenticated,
-    SecurityLevel.LEVEL3: lambda connection: connection.encryption != 0
+    LEVEL0: lambda connection: True,
+    LEVEL1: lambda connection: connection.encryption == 0 or connection.authenticated,
+    LEVEL2: lambda connection: connection.encryption != 0 and connection.authenticated,
+    LEVEL3: lambda connection: connection.encryption != 0
     and connection.authenticated
     and connection.link_key_type
     in (
         hci.HCI_AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_192_TYPE,
         hci.HCI_AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256_TYPE,
     ),
-    SecurityLevel.LEVEL4: lambda connection: connection.encryption == hci.HCI_Encryption_Change_Event.AES_CCM
+    LEVEL4: lambda connection: connection.encryption == hci.HCI_Encryption_Change_Event.AES_CCM
     and connection.authenticated
     and connection.link_key_type == hci.HCI_AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256_TYPE,
 }
 
 LE_LEVEL_REACHED: Dict[LESecurityLevel, Callable[[BumbleConnection], bool]] = {
-    LESecurityLevel.LE_LEVEL1: lambda connection: True,
-    LESecurityLevel.LE_LEVEL2: lambda connection: connection.encryption != 0,
-    LESecurityLevel.LE_LEVEL3: lambda connection: connection.encryption != 0 and connection.authenticated,
-    LESecurityLevel.LE_LEVEL4: lambda connection: connection.encryption != 0
-    and connection.authenticated
-    and connection.sc,
+    LE_LEVEL1: lambda connection: True,
+    LE_LEVEL2: lambda connection: connection.encryption != 0,
+    LE_LEVEL3: lambda connection: connection.encryption != 0 and connection.authenticated,
+    LE_LEVEL4: lambda connection: connection.encryption != 0 and connection.authenticated and connection.sc,
 }
 
 
@@ -364,20 +371,20 @@ class SecurityService(SecurityServicer):
 
     def need_pairing(self, connection: BumbleConnection, level: int) -> bool:
         if connection.transport == BT_LE_TRANSPORT:
-            return level >= LESecurityLevel.LE_LEVEL3 and not connection.authenticated
+            return level >= LE_LEVEL3 and not connection.authenticated
         return False
 
     def need_authentication(self, connection: BumbleConnection, level: int) -> bool:
         if connection.transport == BT_LE_TRANSPORT:
             return False
-        if level == SecurityLevel.LEVEL2 and connection.encryption != 0:
+        if level == LEVEL2 and connection.encryption != 0:
             return not connection.authenticated
-        return level >= SecurityLevel.LEVEL2 and not connection.authenticated
+        return level >= LEVEL2 and not connection.authenticated
 
     def need_encryption(self, connection: BumbleConnection, level: int) -> bool:
         if connection.transport == BT_LE_TRANSPORT:
-            return level == LESecurityLevel.LE_LEVEL2 and not connection.encryption
-        return level >= SecurityLevel.LEVEL2 and not connection.encryption
+            return level == LE_LEVEL2 and not connection.encryption
+        return level >= LEVEL2 and not connection.encryption
 
 
 class SecurityStorageService(SecurityStorageServicer):

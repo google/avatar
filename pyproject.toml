@@ -6,17 +6,17 @@ dynamic = ["version", "description"]
 dependencies = [
     "bt-test-interfaces",
     "bumble",
-    "grpcio>=1.41",
+    "grpcio==1.51.1",
     "mobly>=1.12",
     "bitstruct>=8.12",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "grpcio-tools==1.46.3",
+    "grpcio-tools==1.51.1",
     "black==22.10.0",
-    "pyright==1.1.293",
-    "mypy==0.991",
+    "pyright==1.1.294",
+    "mypy==1.0",
     "isort==5.12.0",
     "types-psutil>=5.9.5.6",
     "types-setuptools>=65.7.0.3",
@@ -53,8 +53,6 @@ ignore_missing_imports = true
 [tool.pyright]
 include = ["avatar", "examples"]
 exclude = ["**/__pycache__"]
-venvPath = "."
-venv = ".venv"
 typeCheckingMode = "strict"
 useLibraryCodeForTypes = true
 verboseOutput = false

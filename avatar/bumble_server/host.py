@@ -43,10 +43,18 @@ from bumble.hci import (
     Address,
 )
 from google.protobuf import any_pb2, empty_pb2
-from pandora.host_grpc import (
+from pandora.host_grpc_aio import HostServicer
+from pandora.host_pb2 import (
+    NOT_CONNECTABLE,
+    NOT_DISCOVERABLE,
+    PRIMARY_1M,
+    PRIMARY_CODED,
+    SECONDARY_1M,
+    SECONDARY_2M,
+    SECONDARY_CODED,
+    SECONDARY_NONE,
     AdvertiseRequest,
     AdvertiseResponse,
-    ConnectabilityMode,
     Connection,
     ConnectLERequest,
     ConnectLEResponse,
@@ -54,7 +62,6 @@ from pandora.host_grpc import (
     ConnectResponse,
     DataTypes,
     DisconnectRequest,
-    DiscoverabilityMode,
     InquiryResponse,
     PrimaryPhy,
     ReadLocalAddressResponse,
@@ -67,16 +74,15 @@ from pandora.host_grpc import (
     WaitConnectionResponse,
     WaitDisconnectionRequest,
 )
-from pandora.host_grpc_aio import HostServicer
 from typing import AsyncGenerator, Dict, List, Optional, Set, Tuple, cast
 
-PRIMARY_PHY_MAP: Dict[int, PrimaryPhy] = {1: PrimaryPhy.PRIMARY_1M, 3: PrimaryPhy.PRIMARY_CODED}
+PRIMARY_PHY_MAP: Dict[int, PrimaryPhy] = {1: PRIMARY_1M, 3: PRIMARY_CODED}
 
 SECONDARY_PHY_MAP: Dict[int, SecondaryPhy] = {
-    0: SecondaryPhy.SECONDARY_NONE,
-    1: SecondaryPhy.SECONDARY_1M,
-    2: SecondaryPhy.SECONDARY_2M,
-    3: SecondaryPhy.SECONDARY_CODED,
+    0: SECONDARY_NONE,
+    1: SECONDARY_1M,
+    2: SECONDARY_2M,
+    3: SECONDARY_CODED,
 }
 
 
@@ -432,14 +438,14 @@ class HostService(HostServicer):
         self, request: SetDiscoverabilityModeRequest, context: grpc.ServicerContext
     ) -> empty_pb2.Empty:
         self.log.info("SetDiscoverabilityMode")
-        await self.device.set_discoverable(request.mode != DiscoverabilityMode.NOT_DISCOVERABLE)
+        await self.device.set_discoverable(request.mode != NOT_DISCOVERABLE)
         return empty_pb2.Empty()
 
     async def SetConnectabilityMode(
         self, request: SetConnectabilityModeRequest, context: grpc.ServicerContext
     ) -> empty_pb2.Empty:
         self.log.info("SetConnectabilityMode")
-        await self.device.set_connectable(request.mode != ConnectabilityMode.NOT_CONNECTABLE)
+        await self.device.set_connectable(request.mode != NOT_CONNECTABLE)
         return empty_pb2.Empty()
 
     def unpack_data_types(self, dt: DataTypes) -> AdvertisingData:
