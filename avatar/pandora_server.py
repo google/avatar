@@ -24,7 +24,7 @@ import time
 import types
 
 from avatar.bumble_device import BumbleDevice
-from avatar.bumble_server import serve_bumble
+from avatar.bumble_server import create_serve_task
 from avatar.controllers import bumble_device, pandora_device
 from avatar.pandora_client import BumblePandoraClient, PandoraClient
 from contextlib import suppress
@@ -82,7 +82,15 @@ class BumblePandoraServer(PandoraServer[BumbleDevice]):
         server = grpc.aio.server()
         port = server.add_insecure_port(f'localhost:{0}')
 
-        self._task = avatar.aio.loop.create_task(serve_bumble(self.device, grpc_server=server, port=port))
+        self._task = avatar.aio.loop.create_task(
+            avatar.aio.run_until_complete(
+                create_serve_task(
+                    self.device,
+                    grpc_server=server,
+                    port=port,
+                )
+            )
+        )
 
         return BumblePandoraClient(f'localhost:{port}', self.device)
 

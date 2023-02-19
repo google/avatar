@@ -106,13 +106,14 @@ def register_servicer_hook(hook: Callable[['Server'], None]) -> None:
     _SERVICERS_HOOKS.append(hook)
 
 
-def serve_bumble(
+async def create_serve_task(
     bumble: BumbleDevice,
     grpc_server: Optional[grpc.aio.Server] = None,
     port: int = 0,
 ) -> Coroutine[None, None, None]:
     # initialize a gRPC server if not provided.
-    server: grpc.aio.Server = grpc_server if grpc_server is not None else grpc.aio.server()
+    server = grpc_server if grpc_server is not None else grpc.aio.server()
+    port = server.add_insecure_port(f'localhost:{port}')
 
     # load IO capability from config.
     io_capability_name: str = bumble.config.get('io_capability', 'no_output_no_input').upper()
@@ -121,20 +122,21 @@ def serve_bumble(
     # create server.
     bumble_server = Server(port, bumble, server, Configuration(io_capability))
 
-    # start bumble server.
-    asyncio.run_coroutine_threadsafe(
-        bumble_server.start(),
-        asyncio.get_event_loop(),
-    ).result()
-
+    # start bumble server & return serve task.
+    await bumble_server.start()
     return bumble_server.serve()
 
 
 BUMBLE_SERVER_GRPC_PORT = 7999
 ROOTCANAL_PORT_CUTTLEFISH = 7300
 
-if __name__ == '__main__':
-    bumble = BumbleDevice({'transport': f'tcp-client:127.0.0.1:{ROOTCANAL_PORT_CUTTLEFISH}', 'classic_enabled': True})
 
+async def amain() -> None:
+    bumble = BumbleDevice({'transport': f'tcp-client:127.0.0.1:{ROOTCANAL_PORT_CUTTLEFISH}', 'classic_enabled': True})
+    serve = await create_serve_task(bumble, port=BUMBLE_SERVER_GRPC_PORT)
+    await serve
+
+
+if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
-    asyncio.run(serve_bumble(bumble, port=BUMBLE_SERVER_GRPC_PORT))
+    asyncio.run(amain())
