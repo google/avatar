@@ -15,9 +15,7 @@
 import asyncio
 import logging
 
-from avatar import PandoraDevices
-from avatar.aio import asynchronous
-from avatar.pandora_client import BumblePandoraClient, PandoraClient
+from avatar import BumbleDevice, PandoraDevice, PandoraDevices, asynchronous
 from bumble.gatt import GATT_ASHA_SERVICE
 from mobly import base_test, test_runner
 from mobly.asserts import assert_equal  # type: ignore
@@ -28,17 +26,17 @@ from pandora.host_pb2 import DataTypes
 class ASHATest(base_test.BaseTestClass):  # type: ignore[misc]
     ASHA_UUID = GATT_ASHA_SERVICE.to_hex_str()
 
-    dut: PandoraClient
-    ref: BumblePandoraClient
+    dut: PandoraDevice
+    ref: BumbleDevice
 
     def setup_class(self) -> None:
         dut, ref = PandoraDevices(self)
-        assert isinstance(ref, BumblePandoraClient)
+        assert isinstance(ref, BumbleDevice)
         self.dut, self.ref = dut, ref
 
     @asynchronous
     async def setup_test(self) -> None:
-        async def reset(device: PandoraClient) -> None:
+        async def reset(device: PandoraDevice) -> None:
             await device.aio.host.FactoryReset()
             device.address = (await device.aio.host.ReadLocalAddress(wait_for_ready=True)).address  # type: ignore[assignment]
 

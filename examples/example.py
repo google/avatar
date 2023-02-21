@@ -16,9 +16,7 @@ import asyncio
 import grpc
 import logging
 
-from avatar import PandoraDevices, parameterized
-from avatar.aio import asynchronous
-from avatar.pandora_client import BumblePandoraClient, PandoraClient
+from avatar import BumbleDevice, PandoraDevice, PandoraDevices, asynchronous, parameterized
 from bumble.smp import PairingDelegate
 from concurrent import futures
 from contextlib import suppress
@@ -46,13 +44,13 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
     devices: Optional[PandoraDevices] = None
 
     # pandora devices.
-    dut: PandoraClient
-    ref: BumblePandoraClient
+    dut: PandoraDevice
+    ref: BumbleDevice
 
     def setup_class(self) -> None:
         self.devices = PandoraDevices(self)
         dut, ref = self.devices
-        assert isinstance(ref, BumblePandoraClient)
+        assert isinstance(ref, BumbleDevice)
         self.dut, self.ref = dut, ref
 
     def teardown_class(self) -> None:
