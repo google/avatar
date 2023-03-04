@@ -18,7 +18,7 @@ import logging
 
 from avatar.bumble_server.utils import BumbleServerLoggerAdapter, address_from_request
 from bumble import hci
-from bumble.core import BT_BR_EDR_TRANSPORT, BT_LE_TRANSPORT, ProtocolError
+from bumble.core import BT_BR_EDR_TRANSPORT, BT_LE_TRANSPORT, BT_PERIPHERAL_ROLE, ProtocolError
 from bumble.device import Connection as BumbleConnection, Device
 from bumble.hci import HCI_Error
 from bumble.smp import PairingConfig, PairingDelegate as BasePairingDelegate
@@ -216,7 +216,18 @@ class SecurityService(SecurityServicer):
         if self.need_pairing(connection, level):
             try:
                 self.log.info('Pair...')
-                await connection.pair()
+
+                if connection.transport == BT_LE_TRANSPORT and connection.role == BT_PERIPHERAL_ROLE:
+                    wait_for_security: asyncio.Future[bool] = asyncio.get_running_loop().create_future()
+                    connection.on("pairing", lambda *_: wait_for_security.set_result(True)) # type:ignore
+                    connection.on("pairing_failure", wait_for_security.set_exception)
+
+                    connection.request_pairing()
+
+                    await wait_for_security
+                else:
+                    await connection.pair()
+
                 self.log.info('Paired')
             except asyncio.CancelledError:
                 self.log.warning(f"Connection died during encryption")
@@ -382,6 +393,7 @@ class SecurityService(SecurityServicer):
         return level >= LEVEL2 and not connection.authenticated
 
     def need_encryption(self, connection: BumbleConnection, level: int) -> bool:
+        # TODO(abel): need to support MITM
         if connection.transport == BT_LE_TRANSPORT:
             return level == LE_LEVEL2 and not connection.encryption
         return level >= LEVEL2 and not connection.encryption
