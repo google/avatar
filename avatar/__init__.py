@@ -174,5 +174,6 @@ def parameterized(*inputs: Tuple[Any, ...]) -> Type[Wrapper]:
                 # we need to pass `input` here, otherwise it will be set to the value
                 # from the last iteration of `inputs`
                 setattr(owner, f"{name}{input}", decorate(input))
+            delattr(owner, name)
 
     return wrapper
