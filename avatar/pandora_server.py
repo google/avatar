@@ -133,9 +133,6 @@ class AndroidPandoraServer(PandoraServer[AndroidDevice]):
         self._instrumentation.start()
         self.device.adb.forward([f'tcp:{self._port}', f'tcp:{ANDROID_SERVER_GRPC_PORT}'])  # type: ignore
 
-        # wait a few seconds for the Android gRPC server to be started.
-        time.sleep(3)
-
         return PandoraClient(f'localhost:{self._port}')
 
     def stop(self) -> None:

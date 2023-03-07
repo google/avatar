@@ -103,7 +103,7 @@ class PandoraClient:
             try:
                 self._address = Address((await self.aio.host.ReadLocalAddress(wait_for_ready=True)).address)
                 return
-            except grpc.RpcError as e:
+            except grpc.aio.AioRpcError as e:
                 assert e.code() == grpc.StatusCode.UNAVAILABLE  # type: ignore
         raise RuntimeError('unable to establish a new connection after a `FactoryReset`')
 

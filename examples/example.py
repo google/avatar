@@ -49,7 +49,7 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
 
     def setup_class(self) -> None:
         self.devices = PandoraDevices(self)
-        dut, ref = self.devices
+        dut, ref, *_ = self.devices
         assert isinstance(ref, BumbleDevice)
         self.dut, self.ref = dut, ref
 
