@@ -219,7 +219,7 @@ class SecurityService(SecurityServicer):
 
                 if connection.transport == BT_LE_TRANSPORT and connection.role == BT_PERIPHERAL_ROLE:
                     wait_for_security: asyncio.Future[bool] = asyncio.get_running_loop().create_future()
-                    connection.on("pairing", lambda *_: wait_for_security.set_result(True)) # type:ignore
+                    connection.on("pairing", lambda *_: wait_for_security.set_result(True))  # type:ignore
                     connection.on("pairing_failure", wait_for_security.set_exception)
 
                     connection.request_pairing()

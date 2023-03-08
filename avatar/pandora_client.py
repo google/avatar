@@ -93,19 +93,15 @@ class PandoraClient:
 
     async def reset(self) -> None:
         """Factory reset the device & read it's BD address."""
-        await self.aio.host.FactoryReset()
+        await self.aio.host.FactoryReset(wait_for_ready=True)
+
         # Factory reset stopped the server, close the client too.
         assert self._aio
         await self._aio.channel.close()
         self._aio = None
-        # Try to connect to the new server 3 times before failing.
-        for _ in range(0, 3):
-            try:
-                self._address = Address((await self.aio.host.ReadLocalAddress(wait_for_ready=True)).address)
-                return
-            except grpc.aio.AioRpcError as e:
-                assert e.code() == grpc.StatusCode.UNAVAILABLE  # type: ignore
-        raise RuntimeError('unable to establish a new connection after a `FactoryReset`')
+
+        # This call might fail if the server is unavailable.
+        self._address = Address((await self.aio.host.ReadLocalAddress(wait_for_ready=True)).address)
 
     # Pandora interfaces
 
