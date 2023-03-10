@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import grpc
 import logging
 
@@ -20,8 +21,8 @@ from bumble.device import Device
 from bumble.profiles.asha_service import AshaService
 from google.protobuf.empty_pb2 import Empty  # pytype: disable=pyi-error
 from pandora.asha_grpc_aio import ASHAServicer
-from pandora.asha_pb2 import RegisterRequest
-from typing import Optional
+from pandora.asha_pb2 import CaptureAudioRequest, CaptureAudioResponse, RegisterRequest
+from typing import AsyncGenerator, Optional
 
 
 class ASHAService(ASHAServicer):
@@ -39,3 +40,20 @@ class ASHAService(ASHAServicer):
         self.asha_service = AshaService(request.capability, request.hisyncid, self.device)
         self.device.add_service(self.asha_service)  # type: ignore[no-untyped-call]
         return Empty()
+
+    async def CaptureAudio(
+        self, request: CaptureAudioRequest, context: grpc.ServicerContext
+    ) -> AsyncGenerator[CaptureAudioResponse, None]:
+        self.log.info('CaptureAudioData')
+
+        if not self.asha_service:
+            raise RuntimeError('The ASHA service has not been registered.')
+
+        queue: asyncio.Queue[CaptureAudioResponse] = asyncio.Queue()
+        handler = self.asha_service.on('data', queue.put_nowait)
+
+        try:
+            while data := await queue.get():
+                yield CaptureAudioResponse(data=data)
+        finally:
+            self.asha_service.remove_listener('data', handler)
