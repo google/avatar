@@ -18,7 +18,7 @@ import logging
 from avatar.bumble_server.utils import BumbleServerLoggerAdapter
 from bumble.device import Device
 from bumble.profiles.asha_service import AshaService
-from google.protobuf.empty_pb2 import Empty
+from google.protobuf.empty_pb2 import Empty  # pytype: disable=pyi-error
 from pandora.asha_grpc_aio import ASHAServicer
 from pandora.asha_pb2 import RegisterRequest
 from typing import Optional

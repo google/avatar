@@ -23,8 +23,8 @@ from bumble.device import Connection as BumbleConnection, Device
 from bumble.hci import HCI_Error
 from bumble.smp import PairingConfig, PairingDelegate as BasePairingDelegate
 from contextlib import suppress
-from google.protobuf import any_pb2, empty_pb2, wrappers_pb2
-from google.protobuf.wrappers_pb2 import BoolValue
+from google.protobuf import any_pb2, empty_pb2, wrappers_pb2  # pytype: disable=pyi-error
+from google.protobuf.wrappers_pb2 import BoolValue  # pytype: disable=pyi-error
 from pandora.host_pb2 import Connection
 from pandora.security_grpc_aio import SecurityServicer, SecurityStorageServicer
 from pandora.security_pb2 import (
@@ -90,7 +90,7 @@ class PairingDelegate(BasePairingDelegate):
 
         event = self.add_origin(PairingEvent(just_works=empty_pb2.Empty()))
         self.service.event_queue.put_nowait(event)
-        answer = await anext(self.service.event_answer)
+        answer = await anext(self.service.event_answer)  # pytype: disable=name-error
         assert answer.event == event
         assert answer.confirm
         return answer.confirm
@@ -103,7 +103,7 @@ class PairingDelegate(BasePairingDelegate):
 
         event = self.add_origin(PairingEvent(numeric_comparison=number))
         self.service.event_queue.put_nowait(event)
-        answer = await anext(self.service.event_answer)
+        answer = await anext(self.service.event_answer)  # pytype: disable=name-error
         assert answer.event == event
         assert answer.confirm
         return answer.confirm
@@ -116,7 +116,7 @@ class PairingDelegate(BasePairingDelegate):
 
         event = self.add_origin(PairingEvent(passkey_entry_request=empty_pb2.Empty()))
         self.service.event_queue.put_nowait(event)
-        answer = await anext(self.service.event_answer)
+        answer = await anext(self.service.event_answer)  # pytype: disable=name-error
         assert answer.event == event
         assert answer.passkey is not None
         return answer.passkey
