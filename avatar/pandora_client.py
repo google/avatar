@@ -15,6 +15,7 @@
 
 """Pandora client interface for Avatar tests."""
 
+import asyncio
 import avatar.aio
 import bumble
 import bumble.device
@@ -55,9 +56,9 @@ class PandoraClient:
     # public fields
     grpc_target: str  # Server address for the gRPC channel.
     log: 'PandoraClientLoggerAdapter'  # Logger adapter.
-    channel: grpc.Channel  # Synchronous gRPC channel.
 
     # private fields
+    _channel: grpc.Channel  # Synchronous gRPC channel.
     _address: Address  # Bluetooth device address
     _aio: Optional['PandoraClient.Aio']  # Asynchronous gRPC channel.
 
@@ -71,13 +72,13 @@ class PandoraClient:
         """
         self.grpc_target = grpc_target
         self.log = PandoraClientLoggerAdapter(logging.getLogger(), {'client': self, 'client_name': name})
-        self.channel = grpc.insecure_channel(grpc_target)  # type: ignore
+        self._channel = grpc.insecure_channel(grpc_target)  # type: ignore
         self._address = Address(b'\x00\x00\x00\x00\x00\x00')
         self._aio = None
 
     def close(self) -> None:
         """Closes the gRPC channels."""
-        self.channel.close()
+        self._channel.close()
         if self._aio:
             avatar.aio.run_until_complete(self._aio.channel.close())
 
@@ -102,6 +103,15 @@ class PandoraClient:
 
         # This call might fail if the server is unavailable.
         self._address = Address((await self.aio.host.ReadLocalAddress(wait_for_ready=True)).address)
+
+    @property
+    def channel(self) -> grpc.Channel:
+        """Returns the synchronous gRPC channel."""
+        try:
+            _ = asyncio.get_running_loop()
+        except:
+            return self._channel
+        raise RuntimeError('Trying to use the synchronous gRPC channel from asynchronous code.')
 
     # Pandora interfaces
 

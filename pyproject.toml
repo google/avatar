@@ -61,6 +61,7 @@ extraPaths = [
     'third-party/bumble'
 ]
 reportMissingTypeStubs = false
+reportUnknownLambdaType = false
 reportImportCycles = false
 
 [tool.pytype]
