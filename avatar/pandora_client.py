@@ -93,7 +93,7 @@ class PandoraClient:
 
     async def reset(self) -> None:
         """Factory reset the device & read it's BD address."""
-        await self.aio.host.FactoryReset(wait_for_ready=True)
+        await self.aio.host.FactoryReset(wait_for_ready=True, timeout=15.0)
 
         # Factory reset stopped the server, close the client too.
         assert self._aio
@@ -101,7 +101,7 @@ class PandoraClient:
         self._aio = None
 
         # This call might fail if the server is unavailable.
-        self._address = Address((await self.aio.host.ReadLocalAddress(wait_for_ready=True)).address)
+        self._address = Address((await self.aio.host.ReadLocalAddress(wait_for_ready=True, timeout=15.0)).address)
 
     # Pandora interfaces
 

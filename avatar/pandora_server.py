@@ -64,7 +64,7 @@ class PandoraServer(Generic[TDevice]):
 
 
 class BumblePandoraServer(PandoraServer[BumbleDevice]):
-    """Manages the Pandora gRPC server on an BumbleDevice."""
+    """Manages the Pandora gRPC server on a BumbleDevice."""
 
     MOBLY_CONTROLLER_MODULE = bumble_device
 
