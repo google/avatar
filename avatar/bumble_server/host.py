@@ -454,46 +454,59 @@ class HostService(HostServicer):
         uuids: List[str]
         datas: Dict[str, bytes]
 
+        def uuid128_from_str(uuid: str) -> bytes:
+            """Decode a 128-bit uuid encoded as XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
+            to byte format."""
+            return bytes(reversed(bytes.fromhex(uuid.replace('-', ''))))
+
+        def uuid32_from_str(uuid: str) -> bytes:
+            """Decode a 32-bit uuid encoded as XXXXXXXX to byte format."""
+            return bytes(reversed(bytes.fromhex(uuid)))
+
+        def uuid16_from_str(uuid: str) -> bytes:
+            """Decode a 16-bit uuid encoded as XXXX to byte format."""
+            return bytes(reversed(bytes.fromhex(uuid)))
+
         if uuids := dt.incomplete_service_class_uuids16:
             ad_structures.append(
                 (
                     AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
-                    b''.join([bytes(reversed(bytes.fromhex(uuid))) for uuid in uuids]),
+                    b''.join([uuid16_from_str(uuid) for uuid in uuids]),
                 )
             )
         if uuids := dt.complete_service_class_uuids16:
             ad_structures.append(
                 (
                     AdvertisingData.COMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
-                    b''.join([bytes(reversed(bytes.fromhex(uuid))) for uuid in uuids]),
+                    b''.join([uuid16_from_str(uuid) for uuid in uuids]),
                 )
             )
         if uuids := dt.incomplete_service_class_uuids32:
             ad_structures.append(
                 (
                     AdvertisingData.INCOMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS,
-                    b''.join([bytes(reversed(bytes.fromhex(uuid))) for uuid in uuids]),
+                    b''.join([uuid32_from_str(uuid) for uuid in uuids]),
                 )
             )
         if uuids := dt.complete_service_class_uuids32:
             ad_structures.append(
                 (
                     AdvertisingData.COMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS,
-                    b''.join([bytes(reversed(bytes.fromhex(uuid))) for uuid in uuids]),
+                    b''.join([uuid32_from_str(uuid) for uuid in uuids]),
                 )
             )
         if uuids := dt.incomplete_service_class_uuids128:
             ad_structures.append(
                 (
                     AdvertisingData.INCOMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS,
-                    b''.join([bytes(reversed(bytes.fromhex(uuid))) for uuid in uuids]),
+                    b''.join([uuid128_from_str(uuid) for uuid in uuids])
                 )
             )
         if uuids := dt.complete_service_class_uuids128:
             ad_structures.append(
                 (
                     AdvertisingData.COMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS,
-                    b''.join([bytes(reversed(bytes.fromhex(uuid))) for uuid in uuids]),
+                    b''.join([uuid128_from_str(uuid) for uuid in uuids])
                 )
             )
         if dt.HasField('include_shortened_local_name'):
@@ -535,41 +548,41 @@ class HostService(HostServicer):
             ad_structures.append(
                 (
                     AdvertisingData.LIST_OF_16_BIT_SERVICE_SOLICITATION_UUIDS,
-                    b''.join([bytes(reversed(bytes.fromhex(uuid))) for uuid in uuids]),
+                    b''.join([uuid16_from_str(uuid) for uuid in uuids]),
                 )
             )
         if uuids := dt.service_solicitation_uuids32:
             ad_structures.append(
                 (
                     AdvertisingData.LIST_OF_32_BIT_SERVICE_SOLICITATION_UUIDS,
-                    b''.join([bytes(reversed(bytes.fromhex(uuid))) for uuid in uuids]),
+                    b''.join([uuid32_from_str(uuid) for uuid in uuids]),
                 )
             )
         if uuids := dt.service_solicitation_uuids128:
             ad_structures.append(
                 (
                     AdvertisingData.LIST_OF_128_BIT_SERVICE_SOLICITATION_UUIDS,
-                    b''.join([bytes(reversed(bytes.fromhex(uuid))) for uuid in uuids]),
+                    b''.join([uuid128_from_str(uuid) for uuid in uuids])
                 )
             )
         if datas := dt.service_data_uuid16:
             ad_structures.extend(
                 [
-                    (AdvertisingData.SERVICE_DATA_16_BIT_UUID, bytes.fromhex(uuid) + data)
+                    (AdvertisingData.SERVICE_DATA_16_BIT_UUID, uuid16_from_str(uuid) + data)
                     for uuid, data in datas.items()
                 ]
             )
         if datas := dt.service_data_uuid32:
             ad_structures.extend(
                 [
-                    (AdvertisingData.SERVICE_DATA_32_BIT_UUID, bytes.fromhex(uuid) + data)
+                    (AdvertisingData.SERVICE_DATA_32_BIT_UUID, uuid32_from_str(uuid) + data)
                     for uuid, data in datas.items()
                 ]
             )
         if datas := dt.service_data_uuid128:
             ad_structures.extend(
                 [
-                    (AdvertisingData.SERVICE_DATA_128_BIT_UUID, bytes.fromhex(uuid) + data)
+                    (AdvertisingData.SERVICE_DATA_128_BIT_UUID, uuid128_from_str(uuid) + data)
                     for uuid, data in datas.items()
                 ]
             )
