@@ -20,23 +20,26 @@ any Bluetooth test cases virtually and physically.
 __version__ = "0.0.1"
 
 import functools
+import grpc
+import grpc.aio
 import importlib
 import logging
 
 from avatar import pandora_server
 from avatar.aio import asynchronous
-from avatar.pandora_client import BumblePandoraClient as BumbleDevice, PandoraClient as PandoraDevice
+from avatar.pandora_client import BumblePandoraClient as BumblePandoraDevice, PandoraClient as PandoraDevice
 from avatar.pandora_server import PandoraServer
 from mobly import base_test
-from typing import Any, Callable, Dict, Iterable, Iterator, List, Sized, Tuple, Type
+from typing import Any, Callable, Dict, Iterable, Iterator, List, Sized, Tuple, Type, TypeVar
 
 # public symbols
 __all__ = [
     'asynchronous',
     'parameterized',
+    'rpc_except',
     'PandoraDevices',
     'PandoraDevice',
-    'BumbleDevice',
+    'BumblePandoraDevice',
 ]
 
 
@@ -177,3 +180,26 @@ def parameterized(*inputs: Tuple[Any, ...]) -> Type[Wrapper]:
             delattr(owner, name)
 
     return wrapper
+
+
+_T = TypeVar('_T')
+
+
+# Decorate a test function with a wrapper that catch gRPC errors
+# and call a callback if the status `code` match.
+def rpc_except(
+    excepts: Dict[grpc.StatusCode, Callable[[grpc.aio.AioRpcError], Any]],
+) -> Callable[[Callable[..., _T]], Callable[..., _T]]:
+    def wrap(func: Callable[..., _T]) -> Callable[..., _T]:
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> _T:
+            try:
+                return func(*args, **kwargs)
+            except (grpc.RpcError, grpc.aio.AioRpcError) as e:
+                if f := excepts.get(e.code(), None):  # type: ignore
+                    return f(e)  # type: ignore
+                raise e
+
+        return wrapper
+
+    return wrap

@@ -17,12 +17,8 @@ TestBeds:
     BumbleDevice:
     # DUT device
     - transport: 'tcp-client:127.0.0.1:6402'
-      classic_enabled: true
       class_of_device: 2360324
-      keystore: 'JsonKeyStore'
       io_capability: display_output_only
     # Reference device
     - transport: 'tcp-client:127.0.0.1:6402'
-      classic_enabled: true
       class_of_device: 2360324
-      keystore: 'JsonKeyStore'

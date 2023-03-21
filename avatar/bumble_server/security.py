@@ -16,7 +16,7 @@ import asyncio
 import grpc
 import logging
 
-from avatar.bumble_server.utils import BumbleServerLoggerAdapter, address_from_request
+from . import utils
 from bumble import hci
 from bumble.core import BT_BR_EDR_TRANSPORT, BT_LE_TRANSPORT, BT_PERIPHERAL_ROLE, ProtocolError
 from bumble.device import Connection as BumbleConnection, Device
@@ -60,7 +60,7 @@ class PairingDelegate(BasePairingDelegate):
         local_initiator_key_distribution: int = BasePairingDelegate.DEFAULT_KEY_DISTRIBUTION,
         local_responder_key_distribution: int = BasePairingDelegate.DEFAULT_KEY_DISTRIBUTION,
     ) -> None:
-        self.log = BumbleServerLoggerAdapter(
+        self.log = utils.BumbleServerLoggerAdapter(
             logging.getLogger(), {'service_name': 'Security', 'device': connection.device}
         )
         self.connection = connection
@@ -157,7 +157,7 @@ LE_LEVEL_REACHED: Dict[LESecurityLevel, Callable[[BumbleConnection], bool]] = {
 
 class SecurityService(SecurityServicer):
     def __init__(self, device: Device, io_capability: int) -> None:
-        self.log = BumbleServerLoggerAdapter(logging.getLogger(), {'service_name': 'Security', 'device': device})
+        self.log = utils.BumbleServerLoggerAdapter(logging.getLogger(), {'service_name': 'Security', 'device': device})
         self.event_queue: Optional[asyncio.Queue[PairingEvent]] = None
         self.event_answer: Optional[AsyncIterator[PairingEventAnswer]] = None
         self.device = device
@@ -175,6 +175,7 @@ class SecurityService(SecurityServicer):
         setattr(device, 'io_capability', io_capability)
         self.device.pairing_config_factory = pairing_config_factory
 
+    @utils.rpc
     async def OnPairing(
         self, request: AsyncIterator[PairingEventAnswer], context: grpc.ServicerContext
     ) -> AsyncGenerator[PairingEvent, None]:
@@ -197,6 +198,7 @@ class SecurityService(SecurityServicer):
             self.event_queue = None
             self.event_answer = None
 
+    @utils.rpc
     async def Secure(self, request: SecureRequest, context: grpc.ServicerContext) -> SecureResponse:
         connection_handle = int.from_bytes(request.connection.cookie.value, 'big')
         self.log.info(f"Secure: {connection_handle}")
@@ -267,6 +269,7 @@ class SecurityService(SecurityServicer):
             return SecureResponse(success=empty_pb2.Empty())
         return SecureResponse(not_reached=empty_pb2.Empty())
 
+    @utils.rpc
     async def WaitSecurity(self, request: WaitSecurityRequest, context: grpc.ServicerContext) -> WaitSecurityResponse:
         connection_handle = int.from_bytes(request.connection.cookie.value, 'big')
         self.log.info(f"WaitSecurity: {connection_handle}")
@@ -401,13 +404,14 @@ class SecurityService(SecurityServicer):
 
 class SecurityStorageService(SecurityStorageServicer):
     def __init__(self, device: Device) -> None:
-        self.log = BumbleServerLoggerAdapter(
+        self.log = utils.BumbleServerLoggerAdapter(
             logging.getLogger(), {'service_name': 'SecurityStorage', 'device': device}
         )
         self.device = device
 
+    @utils.rpc
     async def IsBonded(self, request: IsBondedRequest, context: grpc.ServicerContext) -> wrappers_pb2.BoolValue:
-        address = address_from_request(request, request.WhichOneof("address"))
+        address = utils.address_from_request(request, request.WhichOneof("address"))
         self.log.info(f"IsBonded: {address}")
 
         if self.device.keystore is not None:
@@ -417,8 +421,9 @@ class SecurityStorageService(SecurityStorageServicer):
 
         return BoolValue(value=is_bonded)
 
+    @utils.rpc
     async def DeleteBond(self, request: DeleteBondRequest, context: grpc.ServicerContext) -> empty_pb2.Empty:
-        address = address_from_request(request, request.WhichOneof("address"))
+        address = utils.address_from_request(request, request.WhichOneof("address"))
         self.log.info(f"DeleteBond: {address}")
 
         if self.device.keystore is not None:
