@@ -131,7 +131,7 @@ class AndroidPandoraServer(PandoraServer[AndroidDevice]):
         self._instrumentation.start()
         self.device.adb.forward([f'tcp:{self._port}', f'tcp:{ANDROID_SERVER_GRPC_PORT}'])  # type: ignore
 
-        return PandoraClient(f'localhost:{self._port}')
+        return PandoraClient(f'localhost:{self._port}', 'android')
 
     def stop(self) -> None:
         """Stops and cleans up the Pandora server on the Android device."""

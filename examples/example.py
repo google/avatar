@@ -17,16 +17,16 @@ import avatar
 import grpc
 import logging
 
-from avatar import BumbleDevice, PandoraDevice, PandoraDevices
+from avatar import BumblePandoraDevice, PandoraDevice, PandoraDevices
 from bumble.smp import PairingDelegate
 from concurrent import futures
 from contextlib import suppress
-from mobly import base_test, test_runner
+from mobly import base_test, signals, test_runner
 from mobly.asserts import assert_equal  # type: ignore
 from mobly.asserts import assert_in  # type: ignore
 from mobly.asserts import assert_is_none  # type: ignore
 from mobly.asserts import assert_is_not_none  # type: ignore
-from mobly.asserts import fail  # type: ignore
+from mobly.asserts import explicit_pass, fail  # type: ignore
 from pandora.host_pb2 import (
     DISCOVERABLE_GENERAL,
     DISCOVERABLE_LIMITED,
@@ -46,13 +46,16 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
 
     # pandora devices.
     dut: PandoraDevice
-    ref: BumbleDevice
+    ref: PandoraDevice
 
     def setup_class(self) -> None:
         self.devices = PandoraDevices(self)
-        dut, ref, *_ = self.devices
-        assert isinstance(ref, BumbleDevice)
-        self.dut, self.ref = dut, ref
+        self.dut, self.ref, *_ = self.devices
+
+        # Enable BR/EDR mode for Bumble devices.
+        for device in self.devices:
+            if isinstance(device, BumblePandoraDevice):
+                device.config.setdefault('classic_enabled', True)
 
     def teardown_class(self) -> None:
         if self.devices:
@@ -85,6 +88,9 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
         (RANDOM, PUBLIC),
     )  # type: ignore[misc]
     def test_le_connect(self, dut_address_type: OwnAddressType, ref_address_type: OwnAddressType) -> None:
+        if not isinstance(self.ref, BumblePandoraDevice):
+            raise signals.TestSkip('Test require Bumble as reference device')
+
         advertisement = self.ref.host.Advertise(legacy=True, connectable=True, own_address_type=ref_address_type)
         scan = self.dut.host.Scan(own_address_type=dut_address_type)
         if ref_address_type == PUBLIC:
@@ -105,14 +111,17 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
         assert dut_ref and ref_dut
         self.dut.host.Disconnect(connection=dut_ref)
 
+    @avatar.rpc_except(
+        {
+            # This test should reach the `Inquiry` timeout.
+            grpc.StatusCode.DEADLINE_EXCEEDED: lambda e: explicit_pass(e.details()),
+        }
+    )
     def test_not_discoverable(self) -> None:
         self.dut.host.SetDiscoverabilityMode(mode=NOT_DISCOVERABLE)
         inquiry = self.ref.host.Inquiry(timeout=3.0)
         try:
             assert_is_none(next((x for x in inquiry if x.address == self.dut.address), None))
-        except grpc.RpcError as e:
-            # No peers found; StartInquiry times out
-            assert_equal(e.code(), grpc.StatusCode.DEADLINE_EXCEEDED)  # type: ignore
         finally:
             inquiry.cancel()
 
@@ -215,6 +224,9 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
     )  # type: ignore[misc]
     @avatar.asynchronous
     async def test_classic_pairing(self, ref_io_capability: int) -> None:  # pytype: disable=wrong-arg-types
+        if not isinstance(self.ref, BumblePandoraDevice):
+            raise signals.TestSkip('Test require Bumble as reference device(s)')
+
         # override reference device IO capability
         setattr(self.ref.device, 'io_capability', ref_io_capability)
 
@@ -259,6 +271,9 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
     async def test_le_pairing(  # pytype: disable=wrong-arg-types
         self, dut_address_type: OwnAddressType, ref_address_type: OwnAddressType, ref_io_capability: int
     ) -> None:
+        if not isinstance(self.ref, BumblePandoraDevice):
+            raise signals.TestSkip('Test require Bumble as reference device(s)')
+
         # override reference device IO capability
         setattr(self.ref.device, 'io_capability', ref_io_capability)
 

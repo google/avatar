@@ -19,7 +19,7 @@ import grpc.aio
 import logging
 import struct
 
-from avatar.bumble_server.utils import BumbleServerLoggerAdapter, address_from_request
+from . import utils
 from bumble.core import (
     BT_BR_EDR_TRANSPORT,
     BT_LE_TRANSPORT,
@@ -89,19 +89,16 @@ SECONDARY_PHY_MAP: Dict[int, SecondaryPhy] = {
 class HostService(HostServicer):
     grpc_server: grpc.aio.Server
     device: Device
-    scan_queue: asyncio.Queue[Advertisement]
-    inquiry_queue: asyncio.Queue[Optional[Tuple[Address, int, AdvertisingData, int]]]
     waited_connections: Set[int]
 
     def __init__(self, grpc_server: grpc.aio.Server, device: Device) -> None:
         super().__init__()
-        self.log = BumbleServerLoggerAdapter(logging.getLogger(), {'service_name': 'Host', 'device': device})
+        self.log = utils.BumbleServerLoggerAdapter(logging.getLogger(), {'service_name': 'Host', 'device': device})
         self.grpc_server = grpc_server
         self.device = device
-        self.scan_queue = asyncio.Queue()
-        self.inquiry_queue = asyncio.Queue()
         self.waited_connections = set()
 
+    @utils.rpc
     async def FactoryReset(self, request: empty_pb2.Empty, context: grpc.ServicerContext) -> empty_pb2.Empty:
         self.log.info('FactoryReset')
 
@@ -113,24 +110,25 @@ class HostService(HostServicer):
         asyncio.create_task(self.grpc_server.stop(None))
         return empty_pb2.Empty()
 
+    @utils.rpc
     async def Reset(self, request: empty_pb2.Empty, context: grpc.ServicerContext) -> empty_pb2.Empty:
         self.log.info('Reset')
 
         # clear service.
         self.waited_connections.clear()
-        self.scan_queue = asyncio.Queue()
-        self.inquiry_queue = asyncio.Queue()
 
         # (re) power device on
         await self.device.power_on()
         return empty_pb2.Empty()
 
+    @utils.rpc
     async def ReadLocalAddress(
         self, request: empty_pb2.Empty, context: grpc.ServicerContext
     ) -> ReadLocalAddressResponse:
         self.log.info('ReadLocalAddress')
         return ReadLocalAddressResponse(address=bytes(reversed(bytes(self.device.public_address))))
 
+    @utils.rpc
     async def Connect(self, request: ConnectRequest, context: grpc.ServicerContext) -> ConnectResponse:
         # Need to reverse bytes order since Bumble Address is using MSB.
         address = Address(bytes(reversed(request.address)), address_type=Address.PUBLIC_DEVICE_ADDRESS)
@@ -152,17 +150,16 @@ class HostService(HostServicer):
         cookie = any_pb2.Any(value=connection.handle.to_bytes(4, 'big'))
         return ConnectResponse(connection=Connection(cookie=cookie))
 
+    @utils.rpc
     async def WaitConnection(
         self, request: WaitConnectionRequest, context: grpc.ServicerContext
     ) -> WaitConnectionResponse:
         if not request.address:
-            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)  # type: ignore
             raise ValueError('Request address field must be set')
 
         # Need to reverse bytes order since Bumble Address is using MSB.
         address = Address(bytes(reversed(request.address)), address_type=Address.PUBLIC_DEVICE_ADDRESS)
         if address in (Address.NIL, Address.ANY):
-            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)  # type: ignore
             raise ValueError('Invalid address')
 
         self.log.info(f"WaitConnection from {address}...")
@@ -183,10 +180,10 @@ class HostService(HostServicer):
         cookie = any_pb2.Any(value=connection.handle.to_bytes(4, 'big'))
         return WaitConnectionResponse(connection=Connection(cookie=cookie))
 
+    @utils.rpc
     async def ConnectLE(self, request: ConnectLERequest, context: grpc.ServicerContext) -> ConnectLEResponse:
-        address = address_from_request(request, request.WhichOneof("address"))
+        address = utils.address_from_request(request, request.WhichOneof("address"))
         if address in (Address.NIL, Address.ANY):
-            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)  # type: ignore
             raise ValueError('Invalid address')
 
         self.log.info(f"ConnectLE to {address}...")
@@ -202,7 +199,6 @@ class HostService(HostServicer):
             if e.error_code == HCI_CONNECTION_ALREADY_EXISTS_ERROR:
                 self.log.warning(f"Connection already exists: {e}")
                 return ConnectLEResponse(connection_already_exists=empty_pb2.Empty())
-            context.set_code(grpc.StatusCode.ABORTED)  # type: ignore
             raise e
 
         self.log.info(f"ConnectLE to {address} done (handle={connection.handle})")
@@ -210,6 +206,7 @@ class HostService(HostServicer):
         cookie = any_pb2.Any(value=connection.handle.to_bytes(4, 'big'))
         return ConnectLEResponse(connection=Connection(cookie=cookie))
 
+    @utils.rpc
     async def Disconnect(self, request: DisconnectRequest, context: grpc.ServicerContext) -> empty_pb2.Empty:
         connection_handle = int.from_bytes(request.connection.cookie.value, 'big')
         self.log.info(f"Disconnect: {connection_handle}")
@@ -221,6 +218,7 @@ class HostService(HostServicer):
 
         return empty_pb2.Empty()
 
+    @utils.rpc
     async def WaitDisconnection(
         self, request: WaitDisconnectionRequest, context: grpc.ServicerContext
     ) -> empty_pb2.Empty:
@@ -239,24 +237,23 @@ class HostService(HostServicer):
 
         return empty_pb2.Empty()
 
+    @utils.rpc
     async def Advertise(
         self, request: AdvertiseRequest, context: grpc.ServicerContext
     ) -> AsyncGenerator[AdvertiseResponse, None]:
-        # TODO: add support for extended advertising in Bumble
-        # TODO: add support for `request.interval`
-        # TODO: add support for `request.interval_range`
-        # TODO: add support for `request.primary_phy`
-        # TODO: add support for `request.secondary_phy`
-        assert request.legacy
-        assert not request.interval
-        assert not request.interval_range
-        assert not request.primary_phy
-        assert not request.secondary_phy
+        if not request.legacy:
+            raise NotImplementedError("TODO: add support for extended advertising in Bumble")
+        if request.interval:
+            raise NotImplementedError("TODO: add support for `request.interval`")
+        if request.interval_range:
+            raise NotImplementedError("TODO: add support for `request.interval_range`")
+        if request.primary_phy:
+            raise NotImplementedError("TODO: add support for `request.primary_phy`")
+        if request.secondary_phy:
+            raise NotImplementedError("TODO: add support for `request.secondary_phy`")
 
         if self.device.is_advertising:
-            # TODO: add support for advertising sets.
-            context.set_code(grpc.StatusCode.ABORTED)  # type: ignore
-            raise RuntimeError('Advertising sets are not yet supported, only one `Advertise` is possible at a time')
+            raise NotImplementedError('TODO: add support for advertising sets')
 
         if data := request.data:
             self.device.advertising_data = bytes(self.unpack_data_types(data))
@@ -349,19 +346,24 @@ class HostService(HostServicer):
             if request.connectable:
                 self.device.remove_listener('connection', on_connection)  # type: ignore
 
-            self.log.info('Stop advertising')
-            await self.device.abort_on('flush', self.device.stop_advertising())
+            try:
+                self.log.info('Stop advertising')
+                await self.device.abort_on('flush', self.device.stop_advertising())
+            except:
+                pass
 
+    @utils.rpc
     async def Scan(
         self, request: ScanRequest, context: grpc.ServicerContext
     ) -> AsyncGenerator[ScanningResponse, None]:
-        # TODO: add support for `request.phys`
         # TODO: modify `start_scanning` to accept floats instead of int for ms values
-        assert not request.phys
+        if request.phys:
+            raise NotImplementedError("TODO: add support for `request.phys`")
 
         self.log.info('Scan')
 
-        handler = self.device.on('advertisement', self.scan_queue.put_nowait)
+        scan_queue: asyncio.Queue[Advertisement] = asyncio.Queue()
+        handler = self.device.on('advertisement', scan_queue.put_nowait)
         await self.device.start_scanning(
             legacy=request.legacy,
             active=not request.passive,
@@ -373,7 +375,7 @@ class HostService(HostServicer):
         try:
             # TODO: add support for `direct_address` in Bumble
             # TODO: add support for `periodic_advertising_interval` in Bumble
-            while adv := await self.scan_queue.get():
+            while adv := await scan_queue.get():
                 sr = ScanningResponse(
                     legacy=adv.is_legacy,
                     connectable=adv.is_connectable,
@@ -400,25 +402,30 @@ class HostService(HostServicer):
 
         finally:
             self.device.remove_listener('advertisement', handler)  # type: ignore
-            self.scan_queue = asyncio.Queue()
-            await self.device.abort_on('flush', self.device.stop_scanning())
+            try:
+                self.log.info('Stop scanning')
+                await self.device.abort_on('flush', self.device.stop_scanning())
+            except:
+                pass
 
+    @utils.rpc
     async def Inquiry(
         self, request: empty_pb2.Empty, context: grpc.ServicerContext
     ) -> AsyncGenerator[InquiryResponse, None]:
         self.log.info('Inquiry')
 
-        complete_handler = self.device.on('inquiry_complete', lambda: self.inquiry_queue.put_nowait(None))
+        inquiry_queue: asyncio.Queue[Optional[Tuple[Address, int, AdvertisingData, int]]] = asyncio.Queue()
+        complete_handler = self.device.on('inquiry_complete', lambda: inquiry_queue.put_nowait(None))
         result_handler = self.device.on(  # type: ignore
             'inquiry_result',
-            lambda address, class_of_device, eir_data, rssi: self.inquiry_queue.put_nowait(  # type: ignore
+            lambda address, class_of_device, eir_data, rssi: inquiry_queue.put_nowait(  # type: ignore
                 (address, class_of_device, eir_data, rssi)  # type: ignore
             ),
         )
 
         await self.device.start_discovery(auto_restart=False)
         try:
-            while inquiry_result := await self.inquiry_queue.get():
+            while inquiry_result := await inquiry_queue.get():
                 (address, class_of_device, eir_data, rssi) = inquiry_result
                 # FIXME: if needed, add support for `page_scan_repetition_mode` and `clock_offset` in Bumble
                 yield InquiryResponse(
@@ -431,9 +438,13 @@ class HostService(HostServicer):
         finally:
             self.device.remove_listener('inquiry_complete', complete_handler)  # type: ignore
             self.device.remove_listener('inquiry_result', result_handler)  # type: ignore
-            self.inquiry_queue = asyncio.Queue()
-            await self.device.abort_on('flush', self.device.stop_discovery())
+            try:
+                self.log.info('Stop inquiry')
+                await self.device.abort_on('flush', self.device.stop_discovery())
+            except:
+                pass
 
+    @utils.rpc
     async def SetDiscoverabilityMode(
         self, request: SetDiscoverabilityModeRequest, context: grpc.ServicerContext
     ) -> empty_pb2.Empty:
@@ -441,6 +452,7 @@ class HostService(HostServicer):
         await self.device.set_discoverable(request.mode != NOT_DISCOVERABLE)
         return empty_pb2.Empty()
 
+    @utils.rpc
     async def SetConnectabilityMode(
         self, request: SetConnectabilityModeRequest, context: grpc.ServicerContext
     ) -> empty_pb2.Empty:

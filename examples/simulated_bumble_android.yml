@@ -6,4 +6,3 @@ TestBeds:
     AndroidDevice: '*'
     BumbleDevice:
     - transport: 'tcp-client:127.0.0.1:7300'
-      classic_enabled: true

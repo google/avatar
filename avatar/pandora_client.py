@@ -27,7 +27,7 @@ from avatar.bumble_device import BumbleDevice
 from bumble.hci import Address as BumbleAddress
 from dataclasses import dataclass
 from pandora import asha_grpc, asha_grpc_aio, host_grpc, host_grpc_aio, security_grpc, security_grpc_aio
-from typing import Any, MutableMapping, Optional, Tuple, Union
+from typing import Any, Dict, MutableMapping, Optional, Tuple, Union
 
 
 class Address(bytes):
@@ -186,6 +186,10 @@ class BumblePandoraClient(PandoraClient):
     def __init__(self, grpc_target: str, bumble: BumbleDevice) -> None:
         super().__init__(grpc_target, 'bumble')
         self._bumble = bumble
+
+    @property
+    def config(self) -> Dict[str, Any]:
+        return self._bumble.config
 
     @property
     def device(self) -> bumble.device.Device:
