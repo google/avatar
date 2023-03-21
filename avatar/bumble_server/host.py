@@ -232,8 +232,11 @@ class HostService(HostServicer):
                 disconnection_future.set_result(None)
 
             connection.on('disconnection', on_disconnection)
-            await disconnection_future
-            self.log.info("Disconnected")
+            try:
+                await disconnection_future
+                self.log.info("Disconnected")
+            finally:
+                connection.remove_listener('disconnection', on_disconnection)  # type: ignore
 
         return empty_pb2.Empty()
 
