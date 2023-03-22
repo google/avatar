@@ -94,15 +94,28 @@ class PandoraClient:
 
     async def reset(self) -> None:
         """Factory reset the device & read it's BD address."""
-        await self.aio.host.FactoryReset(wait_for_ready=True, timeout=15.0)
+        attempts, max_attempts = 1, 3
+        while True:
+            try:
+                await self.aio.host.FactoryReset(wait_for_ready=True, timeout=15.0)
 
-        # Factory reset stopped the server, close the client too.
-        assert self._aio
-        await self._aio.channel.close()
-        self._aio = None
+                # Factory reset stopped the server, close the client too.
+                assert self._aio
+                await self._aio.channel.close()
+                self._aio = None
 
-        # This call might fail if the server is unavailable.
-        self._address = Address((await self.aio.host.ReadLocalAddress(wait_for_ready=True, timeout=15.0)).address)
+                # This call might fail if the server is unavailable.
+                self._address = Address(
+                    (await self.aio.host.ReadLocalAddress(wait_for_ready=True, timeout=15.0)).address
+                )
+                return
+            except grpc.aio.AioRpcError as e:
+                if attempts <= max_attempts and e.code() == grpc.StatusCode.UNAVAILABLE:
+                    self.log.debug(f'Server unavailable, retry [{attempts}/{max_attempts}].')
+                    attempts += 1
+                    continue
+                self.log.exception(f'Server still unavailable after {attempts} attempts, abort.')
+                raise e
 
     @property
     def channel(self) -> grpc.Channel:
