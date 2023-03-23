@@ -76,7 +76,13 @@ from pandora.host_pb2 import (
 )
 from typing import AsyncGenerator, Dict, List, Optional, Set, Tuple, cast
 
-PRIMARY_PHY_MAP: Dict[int, PrimaryPhy] = {1: PRIMARY_1M, 3: PRIMARY_CODED}
+PRIMARY_PHY_MAP: Dict[int, PrimaryPhy] = {
+    # Default value reported by Bumble for legacy Advertising reports.
+    # FIXME(uael): `None` might be a better value, but Bumble need to change accordingly.
+    0: PRIMARY_1M,
+    1: PRIMARY_1M,
+    3: PRIMARY_CODED,
+}
 
 SECONDARY_PHY_MAP: Dict[int, SecondaryPhy] = {
     0: SECONDARY_NONE,
