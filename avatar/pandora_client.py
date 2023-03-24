@@ -144,9 +144,9 @@ class PandoraClient:
         return security_grpc.SecurityStorage(self.channel)
 
     @property
-    def asha(self) -> asha_grpc.ASHA:
+    def asha(self) -> asha_grpc.Asha:
         """Returns the Pandora ASHA gRPC interface."""
-        return asha_grpc.ASHA(self.channel)
+        return asha_grpc.Asha(self.channel)
 
     @dataclass
     class Aio:
@@ -168,9 +168,9 @@ class PandoraClient:
             return security_grpc_aio.SecurityStorage(self.channel)
 
         @property
-        def asha(self) -> asha_grpc_aio.ASHA:
+        def asha(self) -> asha_grpc_aio.Asha:
             """Returns the Pandora ASHA gRPC interface."""
-            return asha_grpc_aio.ASHA(self.channel)
+            return asha_grpc_aio.Asha(self.channel)
 
     @property
     def aio(self) -> 'PandoraClient.Aio':
