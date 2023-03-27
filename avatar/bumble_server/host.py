@@ -520,14 +520,14 @@ class HostService(HostServicer):
             ad_structures.append(
                 (
                     AdvertisingData.INCOMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS,
-                    b''.join([uuid128_from_str(uuid) for uuid in uuids])
+                    b''.join([uuid128_from_str(uuid) for uuid in uuids]),
                 )
             )
         if uuids := dt.complete_service_class_uuids128:
             ad_structures.append(
                 (
                     AdvertisingData.COMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS,
-                    b''.join([uuid128_from_str(uuid) for uuid in uuids])
+                    b''.join([uuid128_from_str(uuid) for uuid in uuids]),
                 )
             )
         if dt.HasField('include_shortened_local_name'):
@@ -583,7 +583,7 @@ class HostService(HostServicer):
             ad_structures.append(
                 (
                     AdvertisingData.LIST_OF_128_BIT_SERVICE_SOLICITATION_UUIDS,
-                    b''.join([uuid128_from_str(uuid) for uuid in uuids])
+                    b''.join([uuid128_from_str(uuid) for uuid in uuids]),
                 )
             )
         if datas := dt.service_data_uuid16:

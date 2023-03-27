@@ -92,7 +92,7 @@ class PairingDelegate(BasePairingDelegate):
         self.service.event_queue.put_nowait(event)
         answer = await anext(self.service.event_answer)  # pytype: disable=name-error
         assert answer.event == event
-        assert answer.confirm
+        assert answer.answer_variant() == 'confirm' and answer.confirm is not None
         return answer.confirm
 
     async def compare_numbers(self, number: int, digits: int = 6) -> bool:
@@ -105,10 +105,10 @@ class PairingDelegate(BasePairingDelegate):
         self.service.event_queue.put_nowait(event)
         answer = await anext(self.service.event_answer)  # pytype: disable=name-error
         assert answer.event == event
-        assert answer.confirm
+        assert answer.answer_variant() == 'confirm' and answer.confirm is not None
         return answer.confirm
 
-    async def get_number(self) -> int:
+    async def get_number(self) -> Optional[int]:
         self.log.info(f"Pairing event: `passkey_entry_request` (io_capability: {self.io_capability})")
 
         if self.service.event_queue is None or self.service.event_answer is None:
@@ -118,7 +118,7 @@ class PairingDelegate(BasePairingDelegate):
         self.service.event_queue.put_nowait(event)
         answer = await anext(self.service.event_answer)  # pytype: disable=name-error
         assert answer.event == event
-        assert answer.passkey is not None
+        assert answer.answer_variant() == 'passkey'
         return answer.passkey
 
     async def display_number(self, number: int, digits: int = 6) -> None:
