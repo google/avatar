@@ -110,11 +110,12 @@ class PandoraClient:
                 )
                 return
             except grpc.aio.AioRpcError as e:
-                if attempts <= max_attempts and e.code() == grpc.StatusCode.UNAVAILABLE:
-                    self.log.debug(f'Server unavailable, retry [{attempts}/{max_attempts}].')
-                    attempts += 1
-                    continue
-                self.log.exception(f'Server still unavailable after {attempts} attempts, abort.')
+                if e.code() in (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.DEADLINE_EXCEEDED):
+                    if attempts <= max_attempts:
+                        self.log.debug(f'Server unavailable, retry [{attempts}/{max_attempts}].')
+                        attempts += 1
+                        continue
+                    self.log.exception(f'Server still unavailable after {attempts} attempts, abort.')
                 raise e
 
     @property
