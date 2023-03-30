@@ -26,7 +26,7 @@ import logging
 from avatar.bumble_device import BumbleDevice
 from bumble.hci import Address as BumbleAddress
 from dataclasses import dataclass
-from pandora import asha_grpc, asha_grpc_aio, host_grpc, host_grpc_aio, security_grpc, security_grpc_aio
+from pandora import host_grpc, host_grpc_aio, security_grpc, security_grpc_aio
 from typing import Any, Dict, MutableMapping, Optional, Tuple, Union
 
 
@@ -144,11 +144,6 @@ class PandoraClient:
         """Returns the Pandora SecurityStorage gRPC interface."""
         return security_grpc.SecurityStorage(self.channel)
 
-    @property
-    def asha(self) -> asha_grpc.Asha:
-        """Returns the Pandora ASHA gRPC interface."""
-        return asha_grpc.Asha(self.channel)
-
     @dataclass
     class Aio:
         channel: grpc.aio.Channel
@@ -167,11 +162,6 @@ class PandoraClient:
         def security_storage(self) -> security_grpc_aio.SecurityStorage:
             """Returns the Pandora SecurityStorage gRPC interface."""
             return security_grpc_aio.SecurityStorage(self.channel)
-
-        @property
-        def asha(self) -> asha_grpc_aio.Asha:
-            """Returns the Pandora ASHA gRPC interface."""
-            return asha_grpc_aio.Asha(self.channel)
 
     @property
     def aio(self) -> 'PandoraClient.Aio':

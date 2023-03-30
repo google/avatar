@@ -22,11 +22,9 @@ import grpc.aio
 import logging
 
 from avatar.bumble_device import BumbleDevice
-from avatar.bumble_server.asha import AshaService
 from avatar.bumble_server.host import HostService
 from avatar.bumble_server.security import SecurityService, SecurityStorageService
 from bumble.smp import PairingDelegate
-from pandora.asha_grpc_aio import add_AshaServicer_to_server
 from pandora.host_grpc_aio import add_HostServicer_to_server
 from pandora.security_grpc_aio import add_SecurityServicer_to_server, add_SecurityStorageServicer_to_server
 from typing import Callable, List, Optional
@@ -54,7 +52,6 @@ async def serve_bumble(bumble: BumbleDevice, grpc_server: Optional[grpc.aio.Serv
             add_HostServicer_to_server(HostService(server, bumble.device), server)
             add_SecurityServicer_to_server(SecurityService(bumble.device, io_capability), server)
             add_SecurityStorageServicer_to_server(SecurityStorageService(bumble.device), server)
-            add_AshaServicer_to_server(AshaService(bumble.device), server)
 
             # call hooks if any.
             for hook in _SERVICERS_HOOKS:
