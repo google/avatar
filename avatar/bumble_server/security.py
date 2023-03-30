@@ -136,7 +136,7 @@ class PairingDelegate(BasePairingDelegate):
         if answer.pin is None:
             return None
 
-        pin = answer.pin.decode('utf-8'):
+        pin = answer.pin.decode('utf-8')
         if pin is None or len(pin) > max_length:
             raise ValueError(f'Pin must be utf-8 encoded up to {max_length} bytes')
 
