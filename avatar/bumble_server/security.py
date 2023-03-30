@@ -121,7 +121,7 @@ class PairingDelegate(BasePairingDelegate):
         assert answer.answer_variant() == 'passkey'
         return answer.passkey
 
-    async def get_string(self, max_length) -> Optional[str]:
+    async def get_string(self, max_length: int) -> Optional[str]:
         self.log.info(f"Pairing event: `pin_code_request` (io_capability: {self.io_capability})")
 
         if self.service.event_queue is None or self.service.event_answer is None:
