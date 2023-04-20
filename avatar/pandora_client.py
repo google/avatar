@@ -23,6 +23,7 @@ import grpc
 import grpc.aio
 import logging
 
+from avatar import bumble_server
 from avatar.bumble_device import BumbleDevice
 from bumble.hci import Address as BumbleAddress
 from dataclasses import dataclass
@@ -186,10 +187,16 @@ class BumblePandoraClient(PandoraClient):
     """Special Pandora client which also give access to a Bumble device instance."""
 
     _bumble: BumbleDevice  # Bumble device wrapper.
+    _server_config: bumble_server.Config  # Bumble server config.
 
-    def __init__(self, grpc_target: str, bumble: BumbleDevice) -> None:
+    def __init__(self, grpc_target: str, bumble: BumbleDevice, server_config: bumble_server.Config) -> None:
         super().__init__(grpc_target, 'bumble')
         self._bumble = bumble
+        self._server_config = server_config
+
+    @property
+    def server_config(self) -> bumble_server.Config:
+        return self._server_config
 
     @property
     def config(self) -> Dict[str, Any]:

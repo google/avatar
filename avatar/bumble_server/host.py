@@ -20,6 +20,7 @@ import logging
 import struct
 
 from . import utils
+from .config import Config
 from bumble.core import (
     BT_BR_EDR_TRANSPORT,
     BT_LE_TRANSPORT,
@@ -93,15 +94,13 @@ SECONDARY_PHY_MAP: Dict[int, SecondaryPhy] = {
 
 
 class HostService(HostServicer):
-    grpc_server: grpc.aio.Server
-    device: Device
     waited_connections: Set[int]
 
-    def __init__(self, grpc_server: grpc.aio.Server, device: Device) -> None:
-        super().__init__()
+    def __init__(self, grpc_server: grpc.aio.Server, device: Device, config: Config) -> None:
         self.log = utils.BumbleServerLoggerAdapter(logging.getLogger(), {'service_name': 'Host', 'device': device})
         self.grpc_server = grpc_server
         self.device = device
+        self.config = config
         self.waited_connections = set()
 
     @utils.rpc
@@ -276,7 +275,7 @@ class HostService(HostServicer):
             # Retrieve services data
             for service in self.device.gatt_server.attributes:
                 if isinstance(service, Service) and (service_data := service.get_advertising_data()):
-                    service_uuid = service.uuid.to_hex_str()
+                    service_uuid = service.uuid.to_hex_str('-')
                     if (
                         service_uuid in request.data.incomplete_service_class_uuids16
                         or service_uuid in request.data.complete_service_class_uuids16
@@ -630,17 +629,17 @@ class HostService(HostServicer):
         data: bytes
 
         if uuids := cast(List[UUID], ad.get(AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS)):
-            dt.incomplete_service_class_uuids16.extend(list(map(lambda x: x.to_hex_str(), uuids)))
+            dt.incomplete_service_class_uuids16.extend(list(map(lambda x: x.to_hex_str('-'), uuids)))
         if uuids := cast(List[UUID], ad.get(AdvertisingData.COMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS)):
-            dt.complete_service_class_uuids16.extend(list(map(lambda x: x.to_hex_str(), uuids)))
+            dt.complete_service_class_uuids16.extend(list(map(lambda x: x.to_hex_str('-'), uuids)))
         if uuids := cast(List[UUID], ad.get(AdvertisingData.INCOMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS)):
-            dt.incomplete_service_class_uuids32.extend(list(map(lambda x: x.to_hex_str(), uuids)))
+            dt.incomplete_service_class_uuids32.extend(list(map(lambda x: x.to_hex_str('-'), uuids)))
         if uuids := cast(List[UUID], ad.get(AdvertisingData.COMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS)):
-            dt.complete_service_class_uuids32.extend(list(map(lambda x: x.to_hex_str(), uuids)))
+            dt.complete_service_class_uuids32.extend(list(map(lambda x: x.to_hex_str('-'), uuids)))
         if uuids := cast(List[UUID], ad.get(AdvertisingData.INCOMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS)):
-            dt.incomplete_service_class_uuids128.extend(list(map(lambda x: x.to_hex_str(), uuids)))
+            dt.incomplete_service_class_uuids128.extend(list(map(lambda x: x.to_hex_str('-'), uuids)))
         if uuids := cast(List[UUID], ad.get(AdvertisingData.COMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS)):
-            dt.complete_service_class_uuids128.extend(list(map(lambda x: x.to_hex_str(), uuids)))
+            dt.complete_service_class_uuids128.extend(list(map(lambda x: x.to_hex_str('-'), uuids)))
         if s := cast(str, ad.get(AdvertisingData.SHORTENED_LOCAL_NAME)):
             dt.shortened_local_name = s
         if s := cast(str, ad.get(AdvertisingData.COMPLETE_LOCAL_NAME)):
@@ -653,17 +652,17 @@ class HostService(HostServicer):
             dt.peripheral_connection_interval_min = ij[0]
             dt.peripheral_connection_interval_max = ij[1]
         if uuids := cast(List[UUID], ad.get(AdvertisingData.LIST_OF_16_BIT_SERVICE_SOLICITATION_UUIDS)):
-            dt.service_solicitation_uuids16.extend(list(map(lambda x: x.to_hex_str(), uuids)))
+            dt.service_solicitation_uuids16.extend(list(map(lambda x: x.to_hex_str('-'), uuids)))
         if uuids := cast(List[UUID], ad.get(AdvertisingData.LIST_OF_32_BIT_SERVICE_SOLICITATION_UUIDS)):
-            dt.service_solicitation_uuids32.extend(list(map(lambda x: x.to_hex_str(), uuids)))
+            dt.service_solicitation_uuids32.extend(list(map(lambda x: x.to_hex_str('-'), uuids)))
         if uuids := cast(List[UUID], ad.get(AdvertisingData.LIST_OF_128_BIT_SERVICE_SOLICITATION_UUIDS)):
-            dt.service_solicitation_uuids128.extend(list(map(lambda x: x.to_hex_str(), uuids)))
+            dt.service_solicitation_uuids128.extend(list(map(lambda x: x.to_hex_str('-'), uuids)))
         if uuid_data := cast(Tuple[UUID, bytes], ad.get(AdvertisingData.SERVICE_DATA_16_BIT_UUID)):
-            dt.service_data_uuid16[uuid_data[0].to_hex_str()] = uuid_data[1]
+            dt.service_data_uuid16[uuid_data[0].to_hex_str('-')] = uuid_data[1]
         if uuid_data := cast(Tuple[UUID, bytes], ad.get(AdvertisingData.SERVICE_DATA_32_BIT_UUID)):
-            dt.service_data_uuid32[uuid_data[0].to_hex_str()] = uuid_data[1]
+            dt.service_data_uuid32[uuid_data[0].to_hex_str('-')] = uuid_data[1]
         if uuid_data := cast(Tuple[UUID, bytes], ad.get(AdvertisingData.SERVICE_DATA_128_BIT_UUID)):
-            dt.service_data_uuid128[uuid_data[0].to_hex_str()] = uuid_data[1]
+            dt.service_data_uuid128[uuid_data[0].to_hex_str('-')] = uuid_data[1]
         if data := cast(bytes, ad.get(AdvertisingData.PUBLIC_TARGET_ADDRESS, raw=True)):
             dt.public_target_addresses.extend([data[i * 6 :: i * 6 + 6] for i in range(int(len(data) / 6))])
         if data := cast(bytes, ad.get(AdvertisingData.RANDOM_TARGET_ADDRESS, raw=True)):

@@ -17,11 +17,12 @@ import grpc
 import logging
 
 from . import utils
+from .config import Config
 from bumble import hci
 from bumble.core import BT_BR_EDR_TRANSPORT, BT_LE_TRANSPORT, BT_PERIPHERAL_ROLE, ProtocolError
 from bumble.device import Connection as BumbleConnection, Device
 from bumble.hci import HCI_Error
-from bumble.smp import PairingConfig, PairingDelegate as BasePairingDelegate
+from bumble.pairing import PairingConfig, PairingDelegate as BasePairingDelegate
 from contextlib import suppress
 from google.protobuf import any_pb2, empty_pb2, wrappers_pb2  # pytype: disable=pyi-error
 from google.protobuf.wrappers_pb2 import BoolValue  # pytype: disable=pyi-error
@@ -48,7 +49,7 @@ from pandora.security_pb2 import (
     WaitSecurityRequest,
     WaitSecurityResponse,
 )
-from typing import Any, AsyncGenerator, AsyncIterator, Callable, Dict, Optional, Union, cast
+from typing import Any, AsyncGenerator, AsyncIterator, Callable, Dict, Optional, Union
 
 
 class PairingDelegate(BasePairingDelegate):
@@ -56,9 +57,9 @@ class PairingDelegate(BasePairingDelegate):
         self,
         connection: BumbleConnection,
         service: "SecurityService",
-        io_capability: int = BasePairingDelegate.NO_OUTPUT_NO_INPUT,
-        local_initiator_key_distribution: int = BasePairingDelegate.DEFAULT_KEY_DISTRIBUTION,
-        local_responder_key_distribution: int = BasePairingDelegate.DEFAULT_KEY_DISTRIBUTION,
+        io_capability: BasePairingDelegate.IoCapability = BasePairingDelegate.NO_OUTPUT_NO_INPUT,
+        local_initiator_key_distribution: BasePairingDelegate.KeyDistribution = BasePairingDelegate.DEFAULT_KEY_DISTRIBUTION,
+        local_responder_key_distribution: BasePairingDelegate.KeyDistribution = BasePairingDelegate.DEFAULT_KEY_DISTRIBUTION,
     ) -> None:
         self.log = utils.BumbleServerLoggerAdapter(
             logging.getLogger(), {'service_name': 'Security', 'device': connection.device}
@@ -82,7 +83,7 @@ class PairingDelegate(BasePairingDelegate):
 
         return ev
 
-    async def confirm(self) -> bool:
+    async def confirm(self, auto: bool = False) -> bool:
         self.log.info(f"Pairing event: `just_works` (io_capability: {self.io_capability})")
 
         if self.service.event_queue is None or self.service.event_answer is None:
@@ -143,6 +144,12 @@ class PairingDelegate(BasePairingDelegate):
         return pin
 
     async def display_number(self, number: int, digits: int = 6) -> None:
+        if (
+            self.connection.transport == BT_BR_EDR_TRANSPORT
+            and self.io_capability == BasePairingDelegate.DISPLAY_OUTPUT_ONLY
+        ):
+            return
+
         self.log.info(f"Pairing event: `passkey_entry_notification` (io_capability: {self.io_capability})")
 
         if self.service.event_queue is None:
@@ -177,23 +184,27 @@ LE_LEVEL_REACHED: Dict[LESecurityLevel, Callable[[BumbleConnection], bool]] = {
 
 
 class SecurityService(SecurityServicer):
-    def __init__(self, device: Device, io_capability: int) -> None:
+    def __init__(self, device: Device, config: Config) -> None:
         self.log = utils.BumbleServerLoggerAdapter(logging.getLogger(), {'service_name': 'Security', 'device': device})
         self.event_queue: Optional[asyncio.Queue[PairingEvent]] = None
         self.event_answer: Optional[AsyncIterator[PairingEventAnswer]] = None
         self.device = device
+        self.config = config
 
         def pairing_config_factory(connection: BumbleConnection) -> PairingConfig:
             return PairingConfig(
-                sc=True,
-                mitm=True,
-                bonding=True,
+                sc=config.pairing_sc_enable,
+                mitm=config.pairing_mitm_enable,
+                bonding=config.pairing_bonding_enable,
                 delegate=PairingDelegate(
-                    connection, self, io_capability=cast(int, getattr(self.device, 'io_capability'))
+                    connection,
+                    self,
+                    io_capability=config.io_capability,
+                    local_initiator_key_distribution=config.smp_local_initiator_key_distribution,
+                    local_responder_key_distribution=config.smp_local_responder_key_distribution,
                 ),
             )
 
-        setattr(device, 'io_capability', io_capability)
         self.device.pairing_config_factory = pairing_config_factory
 
     @utils.rpc
@@ -253,7 +264,7 @@ class SecurityService(SecurityServicer):
 
                 self.log.info('Paired')
             except asyncio.CancelledError:
-                self.log.warning(f"Connection died during encryption")
+                self.log.warning("Connection died during encryption")
                 return SecureResponse(connection_died=empty_pb2.Empty())
             except (HCI_Error, ProtocolError) as e:
                 self.log.warning(f"Pairing failure: {e}")
@@ -266,7 +277,7 @@ class SecurityService(SecurityServicer):
                 await connection.authenticate()
                 self.log.info('Authenticated')
             except asyncio.CancelledError:
-                self.log.warning(f"Connection died during authentication")
+                self.log.warning("Connection died during authentication")
                 return SecureResponse(connection_died=empty_pb2.Empty())
             except (HCI_Error, ProtocolError) as e:
                 self.log.warning(f"Authentication failure: {e}")
@@ -279,7 +290,7 @@ class SecurityService(SecurityServicer):
                 await connection.encrypt()
                 self.log.info('Encrypted')
             except asyncio.CancelledError:
-                self.log.warning(f"Connection died during encryption")
+                self.log.warning("Connection died during encryption")
                 return SecureResponse(connection_died=empty_pb2.Empty())
             except (HCI_Error, ProtocolError) as e:
                 self.log.warning(f"Encryption failure: {e}")
@@ -334,13 +345,13 @@ class SecurityService(SecurityServicer):
         def try_set_success(*_: Any) -> None:
             assert connection
             if self.reached_security_level(connection, level):
-                self.log.info(f'Wait for security: done')
+                self.log.info('Wait for security: done')
                 wait_for_security.set_result('success')
 
         def on_encryption_change(*_: Any) -> None:
             assert connection
             if self.reached_security_level(connection, level):
-                self.log.info(f'Wait for security: done')
+                self.log.info('Wait for security: done')
                 wait_for_security.set_result('success')
             elif connection.transport == BT_BR_EDR_TRANSPORT and self.need_authentication(connection, level):
                 nonlocal authenticate_task
@@ -424,11 +435,12 @@ class SecurityService(SecurityServicer):
 
 
 class SecurityStorageService(SecurityStorageServicer):
-    def __init__(self, device: Device) -> None:
+    def __init__(self, device: Device, config: Config) -> None:
         self.log = utils.BumbleServerLoggerAdapter(
             logging.getLogger(), {'service_name': 'SecurityStorage', 'device': device}
         )
         self.device = device
+        self.config = config
 
     @utils.rpc
     async def IsBonded(self, request: IsBondedRequest, context: grpc.ServicerContext) -> wrappers_pb2.BoolValue:

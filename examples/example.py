@@ -18,7 +18,7 @@ import grpc
 import logging
 
 from avatar import BumblePandoraDevice, PandoraDevice, PandoraDevices
-from bumble.smp import PairingDelegate
+from bumble.pairing import PairingDelegate
 from concurrent import futures
 from contextlib import suppress
 from mobly import base_test, signals, test_runner
@@ -75,6 +75,7 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
         dut_address = self.dut.address
         self.dut.log.info(f'Address: {dut_address}')
         connection = self.ref.host.Connect(address=dut_address).connection
+        assert_is_not_none(connection)
         assert connection
         self.ref.log.info(f'Connected with: {dut_address}')
         self.ref.host.Disconnect(connection=connection)
@@ -106,9 +107,9 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
                 own_address_type=dut_address_type,
             ).connection
         scan.cancel()
-        ref_dut = next(advertisement).connection
+        _ = next(advertisement).connection
         advertisement.cancel()
-        assert dut_ref and ref_dut
+        assert dut_ref
         self.dut.host.Disconnect(connection=dut_ref)
 
     @avatar.rpc_except(
@@ -223,12 +224,14 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
         (PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT,),
     )  # type: ignore[misc]
     @avatar.asynchronous
-    async def test_classic_pairing(self, ref_io_capability: int) -> None:  # pytype: disable=wrong-arg-types
+    async def test_classic_pairing(
+        self, ref_io_capability: PairingDelegate.IoCapability
+    ) -> None:  # pytype: disable=wrong-arg-types
         if not isinstance(self.ref, BumblePandoraDevice):
             raise signals.TestSkip('Test require Bumble as reference device(s)')
 
         # override reference device IO capability
-        setattr(self.ref.device, 'io_capability', ref_io_capability)
+        self.ref.server_config.io_capability = ref_io_capability
 
         pairing = asyncio.create_task(self.handle_pairing_events())
         (dut_ref_res, ref_dut_res) = await asyncio.gather(
@@ -240,6 +243,8 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
         assert_equal(dut_ref_res.result_variant(), 'connection')
         ref_dut = ref_dut_res.connection
         dut_ref = dut_ref_res.connection
+        assert_is_not_none(ref_dut)
+        assert_is_not_none(dut_ref)
         assert ref_dut and dut_ref
 
         (secure, wait_security) = await asyncio.gather(
@@ -269,13 +274,16 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
     )  # type: ignore[misc]
     @avatar.asynchronous
     async def test_le_pairing(  # pytype: disable=wrong-arg-types
-        self, dut_address_type: OwnAddressType, ref_address_type: OwnAddressType, ref_io_capability: int
+        self,
+        dut_address_type: OwnAddressType,
+        ref_address_type: OwnAddressType,
+        ref_io_capability: PairingDelegate.IoCapability,
     ) -> None:
         if not isinstance(self.ref, BumblePandoraDevice):
             raise signals.TestSkip('Test require Bumble as reference device(s)')
 
         # override reference device IO capability
-        setattr(self.ref.device, 'io_capability', ref_io_capability)
+        self.ref.server_config.io_capability = ref_io_capability
 
         advertisement = self.dut.aio.host.Advertise(
             legacy=True,
@@ -289,7 +297,6 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
             (x async for x in scan if b'pause cafe' in x.data.manufacturer_specific_data)
         )  # pytype: disable=name-error
         scan.cancel()
-        assert dut
 
         pairing = asyncio.create_task(self.handle_pairing_events())
         (ref_dut_res, dut_ref_res) = await asyncio.gather(
@@ -299,7 +306,8 @@ class ExampleTest(base_test.BaseTestClass):  # type: ignore[misc]
 
         advertisement.cancel()
         ref_dut, dut_ref = ref_dut_res.connection, dut_ref_res.connection
-        assert ref_dut and dut_ref
+        assert_is_not_none(ref_dut)
+        assert ref_dut
 
         (secure, wait_security) = await asyncio.gather(
             self.ref.aio.security.Secure(connection=ref_dut, le=LE_LEVEL3),

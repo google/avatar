@@ -98,8 +98,6 @@ def _make_device(config: Dict[str, Any]) -> Device:
     device_config.load_from_dict(config)
     device = Device(config=device_config, host=None)
 
-    # FIXME: add `classic_enabled` to `DeviceConfiguration` ?
-    device.classic_enabled = config.get('classic_enabled', False)
     # Add fake a2dp service to avoid Android disconnect
     device.sdp_service_records = _make_sdp_records(1)
 

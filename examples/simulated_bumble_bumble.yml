@@ -4,12 +4,12 @@
 #   classic_enabled: [true, false] # (false by default)
 #   class_of_device: 1234 # See assigned numbers
 #   keystore: JsonKeyStore # or empty
-#   io_capability:
-#     no_output_no_input # (default)
-#     keyboard_input_only
-#     display_output_only
-#     display_output_and_yes_no_input
-#     display_output_and_keyboard_input
+#   server:
+#     io_capability: no_output_no_input
+#                    keyboard_input_only
+#                    display_output_only
+#                    display_output_and_yes_no_input # (default)
+#                    display_output_and_keyboard_input
 
 TestBeds:
 - Name: ExampleTest
@@ -17,8 +17,5 @@ TestBeds:
     BumbleDevice:
     # DUT device
     - transport: 'tcp-client:127.0.0.1:6402'
-      class_of_device: 2360324
-      io_capability: display_output_only
     # Reference device
     - transport: 'tcp-client:127.0.0.1:6402'
-      class_of_device: 2360324

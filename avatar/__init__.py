@@ -19,6 +19,7 @@ any Bluetooth test cases virtually and physically.
 
 __version__ = "0.0.1"
 
+import enum
 import functools
 import grpc
 import grpc.aio
@@ -30,7 +31,7 @@ from avatar.aio import asynchronous
 from avatar.pandora_client import BumblePandoraClient as BumblePandoraDevice, PandoraClient as PandoraDevice
 from avatar.pandora_server import PandoraServer
 from mobly import base_test
-from typing import Any, Callable, Dict, Iterable, Iterator, List, Sized, Tuple, Type, TypeVar
+from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Sized, Tuple, Type, TypeVar
 
 # public symbols
 __all__ = [
@@ -174,9 +175,18 @@ def parameterized(*inputs: Tuple[Any, ...]) -> Type[Wrapper]:
 
                     return wrapper
 
+                def normalize(a: Any) -> Any:
+                    if isinstance(a, enum.Enum):
+                        return a.value
+                    return a
+
                 # we need to pass `input` here, otherwise it will be set to the value
                 # from the last iteration of `inputs`
-                setattr(owner, f"{name}{input}".replace(' ', ''), decorate(input))
+                setattr(
+                    owner,
+                    f"{name}{tuple([normalize(a) for a in input])}".replace(" ", ""),
+                    decorate(input),
+                )
             delattr(owner, name)
 
     return wrapper
