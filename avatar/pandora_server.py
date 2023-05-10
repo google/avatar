@@ -22,10 +22,10 @@ import grpc.aio
 import threading
 import types
 
-from avatar import bumble_server
-from avatar.bumble_device import BumbleDevice
 from avatar.controllers import bumble_device, pandora_device
 from avatar.pandora_client import BumblePandoraClient, PandoraClient
+from bumble import pandora as bumble_server
+from bumble.pandora.device import PandoraDevice as BumblePandoraDevice
 from contextlib import suppress
 from mobly.controllers import android_device
 from mobly.controllers.android_device import AndroidDevice
@@ -63,7 +63,7 @@ class PandoraServer(Generic[TDevice]):
         """Stops and cleans up the Pandora server on the device."""
 
 
-class BumblePandoraServer(PandoraServer[BumbleDevice]):
+class BumblePandoraServer(PandoraServer[BumblePandoraDevice]):
     """Manages the Pandora gRPC server on a BumbleDevice."""
 
     MOBLY_CONTROLLER_MODULE = bumble_device
