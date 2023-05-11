@@ -24,6 +24,8 @@ import grpc.aio
 import logging
 
 from bumble import pandora as bumble_server
+from avatar.bumble_device import BumbleDevice
+from avatar.metrics import Metric
 from bumble.hci import Address as BumbleAddress
 from bumble.pandora.device import PandoraDevice as BumblePandoraDevice
 from dataclasses import dataclass
@@ -74,8 +76,10 @@ class PandoraClient:
         """
         self.name = name
         self.grpc_target = grpc_target
-        self.log = PandoraClientLoggerAdapter(logging.getLogger(), {'client': self})
-        self._channel = grpc.insecure_channel(grpc_target)  # type: ignore
+        self.log = PandoraClientLoggerAdapter(logging.getLogger(), {'client': self, 'client_name': name})
+        self._name = name
+        self._metric = Metric(name)
+        self._channel = grpc.intercept_channel(grpc.insecure_channel(grpc_target), *self._metric.interceptors)  # type: ignore
         self._address = Address(b'\x00\x00\x00\x00\x00\x00')
         self._aio = None
 
@@ -117,7 +121,7 @@ class PandoraClient:
                     if attempts <= max_attempts:
                         self.log.debug(f'Server unavailable, retry [{attempts}/{max_attempts}].')
                         attempts += 1
-                        continue
+                    continue
                     self.log.exception(f'Server still unavailable after {attempts} attempts, abort.')
                 raise e
 
@@ -131,6 +135,11 @@ class PandoraClient:
         raise RuntimeError('Trying to use the synchronous gRPC channel from asynchronous code.')
 
     # Pandora interfaces
+
+    @property
+    def metric(self) -> Metric:
+        """Returns the Avatar Metric."""
+        return self._metric
 
     @property
     def host(self) -> host_grpc.Host:
@@ -169,7 +178,9 @@ class PandoraClient:
     @property
     def aio(self) -> 'PandoraClient.Aio':
         if not self._aio:
-            self._aio = PandoraClient.Aio(grpc.aio.insecure_channel(self.grpc_target))
+            self._aio = PandoraClient.Aio(
+                grpc.aio.insecure_channel(self.grpc_target, interceptors=self._metric.aio_interceptors)
+            )
         return self._aio
 
 

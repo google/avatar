@@ -28,6 +28,7 @@ import logging
 
 from avatar import pandora_server
 from avatar.aio import asynchronous
+from avatar.metrics import metrics
 from avatar.pandora_client import BumblePandoraClient as BumblePandoraDevice, PandoraClient as PandoraDevice
 from avatar.pandora_server import PandoraServer
 from mobly import base_test
@@ -36,6 +37,7 @@ from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Size
 # public symbols
 __all__ = [
     'asynchronous',
+    'metrics',
     'parameterized',
     'rpc_except',
     'PandoraDevices',
@@ -115,6 +117,9 @@ class PandoraDevices(Sized, Iterable[PandoraDevice]):
 
     def __iter__(self) -> Iterator[PandoraDevice]:
         return iter(self._clients)
+
+    def __getitem__(self, index: int) -> PandoraDevice:
+        return self._clients[index]
 
     def start_all(self) -> None:
         """Start all Pandora servers and returns their clients."""
