@@ -207,7 +207,7 @@ class AioUnaryStreamInterceptor(grpc.aio.UnaryStreamClientInterceptor):  # type:
         start = time.perf_counter()
         unary_stream_call = await continuation(client_call_details, request)  # type: ignore
 
-        async def response_iterator() -> ResponseIterableType:
+        async def responsor() -> ResponseIterableType:
             nonlocal start, unary_stream_call
             async for response in unary_stream_call:  # type: ignore
                 call = Call.compute_call(
@@ -217,7 +217,7 @@ class AioUnaryStreamInterceptor(grpc.aio.UnaryStreamClientInterceptor):  # type:
 
                 yield response
 
-        return response_iterator()
+        return responsor()
 
 
 class AioStreamStreamInterceptor(grpc.aio.StreamStreamClientInterceptor):  # type: ignore
@@ -242,7 +242,7 @@ class AioStreamStreamInterceptor(grpc.aio.StreamStreamClientInterceptor):  # typ
 
         stream_stream_call = await continuation(client_call_details, requestor())  # type: ignore
 
-        async def response_iterator() -> ResponseIterableType:
+        async def responsor() -> ResponseIterableType:
             nonlocal stream_stream_call
             async for response in stream_stream_call:  # type: ignore
                 call = Call.compute_call(
@@ -252,4 +252,4 @@ class AioStreamStreamInterceptor(grpc.aio.StreamStreamClientInterceptor):  # typ
 
                 yield response
 
-        return response_iterator()
+        return responsor()
