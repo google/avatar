@@ -1,8 +1,14 @@
 [project]
 name = "avatar"
+version = "0.0.1"
 authors = [{name = "Pandora", email = "pandora-core@google.com"}]
+description = "Avatar aims to provide a scalable multi-platform Bluetooth testing tool capable of running any Bluetooth test cases virtually and physically."
 readme = "README.md"
-dynamic = ["version", "description"]
+requires-python = ">=3.10.9"
+classifiers = [
+    "Programming Language :: Python :: 3.10",
+    "License :: OSI Approved :: Apache Software License"
+]
 dependencies = [
     "bt-test-interfaces",
     "bumble",
@@ -10,6 +16,9 @@ dependencies = [
     "mobly>=1.12",
     "bitstruct>=8.12",
 ]
+
+[project.urls]
+"Source" = "https://github.com/google/avatar"
 
 [project.optional-dependencies]
 dev = [
