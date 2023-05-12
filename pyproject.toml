@@ -1,9 +1,8 @@
 [project]
-name = "avatar"
-version = "0.0.1"
+name = "pandora-avatar"
 authors = [{name = "Pandora", email = "pandora-core@google.com"}]
-description = "Avatar aims to provide a scalable multi-platform Bluetooth testing tool capable of running any Bluetooth test cases virtually and physically."
 readme = "README.md"
+dynamic = ["version", "description"]
 requires-python = ">=3.10.9"
 classifiers = [
     "Programming Language :: Python :: 3.10",
@@ -36,6 +35,9 @@ dev = [
 line-length = 119
 target-version = ["py38", "py39", "py310", "py311"]
 skip-string-normalization = true
+
+[tool.flit.module]
+name = "avatar"
 
 [tool.isort]
 profile = "black"
