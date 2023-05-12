@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.urls]
-"Source" = "https://github.com/google/avatar"
+Source = "https://github.com/google/avatar"
 
 [project.optional-dependencies]
 dev = [
