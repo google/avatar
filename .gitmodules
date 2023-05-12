@@ -1,6 +1,6 @@
 [submodule "bt-test-interfaces"]
 	path = bt-test-interfaces
-	url = sso://pandora/bt-test-interfaces
+	url = ../../google/bt-test-interfaces.git
 [submodule "bumble"]
 	path = third-party/bumble
-	url = sso://github/google/bumble
+	url = ../../google/bumble.git
