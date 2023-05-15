@@ -7,11 +7,8 @@ complete PTS-bot in the Pandora testing suite.
 ## Install
 
 ```bash
-git submodule update --init
 python -m venv venv
 source venv/bin/activate.fish # or any other shell
-pip install bumble
-pip install bt-test-interfaces
 pip install [-e] .
 ```
 
