@@ -15,7 +15,7 @@ pip install [-e] .
 ## Usage
 
 ```bash
-python examples/example.py -c examples/simulated_bumble_android.yml --verbose
+python cases/host_test.py -c cases/config.yml --verbose
 ```
 
 ## Development
@@ -27,7 +27,7 @@ root-canal
 
 1. Run the example using Bumble vs Bumble config file. The default `6402` HCI port of `root-canal` may be changed in this config file.
 ```
-python examples/example.py -c examples/simulated_bumble_bumble.yml --verbose
+python cases/host_test.py -c cases/config.yml --verbose
 ```
 
 3. Lint with `pyright` and `mypy`
@@ -38,6 +38,6 @@ mypy
 
 3. Format & imports style
 ```
-black avatar/ examples/
-isort avatar/ examples/
+black avatar/ cases/
+isort avatar/ cases/
 ```
