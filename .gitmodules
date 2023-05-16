@@ -1,6 +1,0 @@
-[submodule "bt-test-interfaces"]
-	path = bt-test-interfaces
-	url = ../../google/bt-test-interfaces.git
-[submodule "bumble"]
-	path = third-party/bumble
-	url = ../../google/bumble.git

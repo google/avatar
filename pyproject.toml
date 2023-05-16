@@ -10,7 +10,7 @@ classifiers = [
 ]
 dependencies = [
     "bt-test-interfaces",
-    "bumble",
+    "bumble==0.0.151",
     "grpcio==1.51.1",
     "mobly>=1.12",
     "bitstruct>=8.12",
