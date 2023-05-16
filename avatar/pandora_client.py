@@ -55,6 +55,7 @@ class PandoraClient:
     """Provides Pandora interface access to a device via gRPC."""
 
     # public fields
+    name: str
     grpc_target: str  # Server address for the gRPC channel.
     log: 'PandoraClientLoggerAdapter'  # Logger adapter.
 
@@ -71,8 +72,9 @@ class PandoraClient:
         Args:
           grpc_target: Server address for the gRPC channel.
         """
+        self.name = name
         self.grpc_target = grpc_target
-        self.log = PandoraClientLoggerAdapter(logging.getLogger(), {'client': self, 'client_name': name})
+        self.log = PandoraClientLoggerAdapter(logging.getLogger(), {'client': self})
         self._channel = grpc.insecure_channel(grpc_target)  # type: ignore
         self._address = Address(b'\x00\x00\x00\x00\x00\x00')
         self._aio = None
@@ -178,9 +180,8 @@ class PandoraClientLoggerAdapter(logging.LoggerAdapter):  # type: ignore
         assert self.extra
         client = self.extra['client']
         assert isinstance(client, PandoraClient)
-        client_name = self.extra.get('client_name', client.__class__.__name__)
         addr = ':'.join([f'{x:02X}' for x in client.address[4:]])
-        return (f'[{client_name}:{addr}] {msg}', kwargs)
+        return (f'[{client.name}:{addr}] {msg}', kwargs)
 
 
 class BumblePandoraClient(PandoraClient):
