@@ -17,18 +17,18 @@
 import asyncio
 import avatar.aio
 
-from bumble.pandora.device import PandoraDevice as BumblePandoraDevice
+from avatar.bumble_device import BumbleDevice
 from typing import Any, Dict, List, Optional
 
 MOBLY_CONTROLLER_CONFIG_NAME = 'BumbleDevice'
 
 
-def create(configs: List[Dict[str, Any]]) -> List[BumblePandoraDevice]:
+def create(configs: List[Dict[str, Any]]) -> List[BumbleDevice]:
     """Create a list of `BumbleDevice` from configs."""
-    return [BumblePandoraDevice(config) for config in configs]
+    return [BumbleDevice(config) for config in configs]
 
 
-def destroy(devices: List[BumblePandoraDevice]) -> None:
+def destroy(devices: List[BumbleDevice]) -> None:
     """Destroy each `BumbleDevice`"""
 
     async def close_devices() -> None:
@@ -37,6 +37,6 @@ def destroy(devices: List[BumblePandoraDevice]) -> None:
     avatar.aio.run_until_complete(close_devices())
 
 
-def get_info(devices: List[BumblePandoraDevice]) -> List[Optional[Dict[str, str]]]:
-    """Return the device info for each `BumblePandoraDevice`."""
+def get_info(devices: List[BumbleDevice]) -> List[Optional[Dict[str, str]]]:
+    """Return the device info for each `BumbleDevice`."""
     return [device.info() for device in devices]
