@@ -1,27 +1,19 @@
 [project]
-name = "pandora-avatar"
+name = "avatar"
 authors = [{name = "Pandora", email = "pandora-core@google.com"}]
 readme = "README.md"
 dynamic = ["version", "description"]
-requires-python = ">=3.8"
-classifiers = [
-    "Programming Language :: Python :: 3.10",
-    "License :: OSI Approved :: Apache Software License"
-]
 dependencies = [
     "bt-test-interfaces",
-    "bumble==0.0.154",
-    "grpcio>=1.51.1",
+    "bumble",
+    "grpcio==1.51.1",
     "mobly>=1.12",
     "bitstruct>=8.12",
 ]
 
-[project.urls]
-Source = "https://github.com/google/avatar"
-
 [project.optional-dependencies]
 dev = [
-    "grpcio-tools>=1.51.1",
+    "grpcio-tools==1.51.1",
     "black==22.10.0",
     "pyright==1.1.298",
     "mypy==1.0",
@@ -36,9 +28,6 @@ line-length = 119
 target-version = ["py38", "py39", "py310", "py311"]
 skip-string-normalization = true
 
-[tool.flit.module]
-name = "avatar"
-
 [tool.isort]
 profile = "black"
 line_length = 119
@@ -49,7 +38,9 @@ combine_as_imports = true
 [tool.mypy]
 strict = true
 warn_unused_ignores = false
-files = ["avatar", "cases"]
+files = ["avatar", "examples"]
+mypy_path = '$MYPY_CONFIG_FILE_DIR/bt-test-interfaces/python:$MYPY_CONFIG_FILE_DIR/third-party/bumble'
+exclude = 'third-party/bumble'
 
 [[tool.mypy.overrides]]
 module = "grpc.*"
@@ -60,17 +51,21 @@ module = "mobly.*"
 ignore_missing_imports = true
 
 [tool.pyright]
-include = ["avatar", "cases"]
+include = ["avatar", "examples"]
 exclude = ["**/__pycache__"]
 typeCheckingMode = "strict"
 useLibraryCodeForTypes = true
 verboseOutput = false
+extraPaths = [
+    'bt-test-interfaces/python',
+    'third-party/bumble'
+]
 reportMissingTypeStubs = false
 reportUnknownLambdaType = false
 reportImportCycles = false
 
 [tool.pytype]
-inputs = ['avatar', 'cases']
+inputs = ['avatar', 'examples']
 
 [build-system]
 requires = ["flit_core==3.7.1"]
