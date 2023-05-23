@@ -10,8 +10,8 @@ classifiers = [
 ]
 dependencies = [
     "bt-test-interfaces",
-    "bumble==0.0.152",
-    "grpcio==1.51.1",
+    "bumble==0.0.153",
+    "grpcio>=1.51.1",
     "mobly>=1.12",
     "bitstruct>=8.12",
 ]
@@ -21,7 +21,7 @@ Source = "https://github.com/google/avatar"
 
 [project.optional-dependencies]
 dev = [
-    "grpcio-tools==1.51.1",
+    "grpcio-tools>=1.51.1",
     "black==22.10.0",
     "pyright==1.1.298",
     "mypy==1.0",
@@ -50,8 +50,6 @@ combine_as_imports = true
 strict = true
 warn_unused_ignores = false
 files = ["avatar", "cases"]
-mypy_path = '$MYPY_CONFIG_FILE_DIR/bt-test-interfaces/python:$MYPY_CONFIG_FILE_DIR/third-party/bumble'
-exclude = 'third-party/bumble'
 
 [[tool.mypy.overrides]]
 module = "grpc.*"
@@ -67,10 +65,6 @@ exclude = ["**/__pycache__"]
 typeCheckingMode = "strict"
 useLibraryCodeForTypes = true
 verboseOutput = false
-extraPaths = [
-    'bt-test-interfaces/python',
-    'third-party/bumble'
-]
 reportMissingTypeStubs = false
 reportUnknownLambdaType = false
 reportImportCycles = false
