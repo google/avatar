@@ -194,7 +194,7 @@ class SecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
                         self.ref.log.info(
                             f"Role switch to: {'`CENTRAL`' if role == HCI_CENTRAL_ROLE else '`PERIPHERAL`'}"
                         )
-                    await ref_dut_raw.switch_role(role)
+                        await ref_dut_raw.switch_role(role)
 
             # Pairing.
             if pair == 'incoming_pairing':
