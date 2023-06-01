@@ -247,7 +247,9 @@ class SecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
                         confirm = ref_ev.numeric_comparison == dut_ev.numeric_comparison
 
                     dut_ev_answer = PairingEventAnswer(event=dut_ev, confirm=False if variant == 'reject' else confirm)
-                    ref_ev_answer = PairingEventAnswer(event=ref_ev, confirm=False if variant == 'rejected' else confirm)
+                    ref_ev_answer = PairingEventAnswer(
+                        event=ref_ev, confirm=False if variant == 'rejected' else confirm
+                    )
 
                 elif dut_ev.method_variant() == 'passkey_entry_notification':
                     assert_equal(ref_ev.method_variant(), 'passkey_entry_request')
