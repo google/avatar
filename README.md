@@ -18,6 +18,11 @@ pip install [-e] .
 python cases/host_test.py -c cases/config.yml --verbose
 ```
 
+## Specify a test bed
+```bash
+python cases/host_test.py -c cases/config.yml --test_bed bumble.bumbles --verbose
+```
+
 ## Development
 
 1. Make sure to have a `root-canal` instance running somewhere.
