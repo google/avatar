@@ -13,5 +13,3 @@
 # limitations under the License.
 
 """Avatar Mobly controllers."""
-
-__version__ = "0.0.1"
