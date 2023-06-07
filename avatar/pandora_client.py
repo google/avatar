@@ -24,7 +24,6 @@ import grpc.aio
 import logging
 
 from bumble import pandora as bumble_server
-from avatar.bumble_device import BumbleDevice
 from avatar.metrics import Metric
 from bumble.hci import Address as BumbleAddress
 from bumble.pandora.device import PandoraDevice as BumblePandoraDevice

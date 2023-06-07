@@ -35,6 +35,7 @@ from pandora.host_pb2 import (
 from typing import Optional
 
 
+@avatar.metrics
 class HostTest(base_test.BaseTestClass):  # type: ignore[misc]
     devices: Optional[PandoraDevices] = None
 
