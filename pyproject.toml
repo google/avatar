@@ -11,9 +11,9 @@ classifiers = [
 dependencies = [
     "bt-test-interfaces",
     "bumble==0.0.154",
+    "protobuf>=4.22.0",
     "grpcio>=1.51.1",
     "mobly>=1.12",
-    "bitstruct>=8.12",
 ]
 
 [project.urls]
@@ -53,6 +53,10 @@ files = ["avatar", "cases"]
 
 [[tool.mypy.overrides]]
 module = "grpc.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "google.protobuf.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
