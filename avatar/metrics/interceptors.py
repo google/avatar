@@ -12,14 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-"""Avatar metrics"""
+"""Avatar metrics interceptors."""
 
 import grpc
-import re
-import time
 
-from google.protobuf.text_encoding import CUnescape
+from avatar.metrics.trace import Callsite
 from pandora import _utils as utils
 from typing import (
     TYPE_CHECKING,
@@ -61,66 +58,6 @@ def aio_interceptors(device: PandoraClient) -> Sequence[grpc.aio.ClientIntercept
     return [AioUnaryUnaryInterceptor(device), AioUnaryStreamInterceptor(device), AioStreamStreamInterceptor(device)]
 
 
-class CallSite(Generic[_T]):
-    id_counter = 0
-
-    @classmethod
-    def next_id(cls) -> int:
-        cls.id_counter += 1
-        return cls.id_counter
-
-    def __init__(self, device: PandoraClient, name: Union[bytes, str], message: _T) -> None:
-        self.id = CallSite.next_id()
-        self.at = time.perf_counter()
-        self.name = name if isinstance(name, str) else name.decode('utf-8')
-        self.device = device
-        self.message = message
-
-        device.log.info(f"{self}")
-
-    def __str__(self) -> str:
-        name_pretty = self.name[1:].replace('/', '.')
-        if self.message is None:
-            return f"%{self.id} {name_pretty}"
-        message_pretty = message_prettifier(f"{self.message}")
-        return f"%{self.id} {name_pretty}({message_pretty})"
-
-    def complete(self, message: _U) -> "CallCompletion[_T, _U]":
-        return CallCompletion(self, message)
-
-    def output(self: "CallSite[None]", message: _U) -> "CallOutput[_U]":
-        return CallOutput(self, message)
-
-    def input(self: "CallSite[None]", message: _U) -> "CallInput[_U]":
-        return CallInput(self, message)
-
-
-class CallCompletion(Generic[_T, _U]):
-    def __init__(self, callsite: CallSite[_T], message: _U) -> None:
-        self.at = time.perf_counter()
-        self.callsite = callsite
-        self.message = message
-
-        callsite.device.log.info(f"{self}")
-
-    def __str__(self) -> str:
-        return "└── " + self.stringify('->')
-
-    def stringify(self, direction: str) -> str:
-        message_pretty = message_prettifier(f"{self.message}")
-        return f"[{self.at - self.callsite.at:.3f}s] {self.callsite} {direction} ({message_pretty})"
-
-
-class CallOutput(Generic[_T], CallCompletion[None, _T]):
-    def __str__(self) -> str:
-        return "├── " + self.stringify('->')
-
-
-class CallInput(Generic[_T], CallCompletion[None, _T]):
-    def __str__(self) -> str:
-        return "├── " + self.stringify('<-')
-
-
 class ClientCallDetails(Protocol):
     method: Union[bytes, str]
 
@@ -140,9 +77,9 @@ class UnaryUnaryInterceptor(grpc.UnaryUnaryClientInterceptor):  # type: ignore[m
         client_call_details: ClientCallDetails,
         request: _T,
     ) -> UnaryOutcome[_U]:
-        callsite = CallSite(self.device, client_call_details.method, request)
+        callsite = Callsite(self.device, client_call_details.method, request)
         response = continuation(client_call_details, request)
-        callsite.complete(response.result())
+        callsite.end(response.result())
         return response
 
 
@@ -156,8 +93,9 @@ class UnaryStreamInterceptor(grpc.UnaryStreamClientInterceptor):  # type: ignore
         client_call_details: ClientCallDetails,
         request: _T,
     ) -> utils.Stream[_U]:
-        callsite = CallSite(self.device, client_call_details.method, request)
+        callsite = Callsite(self.device, client_call_details.method, request)
         call = continuation(client_call_details, request)
+        call.add_callback(lambda: callsite.end(None))  # type: ignore
 
         class Proxy:
             def __iter__(self) -> Iterator[_U]:
@@ -165,7 +103,7 @@ class UnaryStreamInterceptor(grpc.UnaryStreamClientInterceptor):  # type: ignore
 
             def __next__(self) -> _U:
                 res = next(call)
-                callsite.complete(res)
+                callsite.input(res)
                 return res
 
             def is_active(self) -> bool:
@@ -193,7 +131,7 @@ class StreamStreamInterceptor(grpc.StreamStreamClientInterceptor):  # type: igno
         client_call_details: ClientCallDetails,
         request: utils.Sender[_T],
     ) -> utils.StreamStream[_T, _U]:
-        callsite = CallSite(self.device, client_call_details.method, None)
+        callsite = Callsite(self.device, client_call_details.method, None)
 
         class RequestProxy:
             def __iter__(self) -> Iterator[_T]:
@@ -205,6 +143,7 @@ class StreamStreamInterceptor(grpc.StreamStreamClientInterceptor):  # type: igno
                 return req
 
         call = continuation(client_call_details, RequestProxy())  # type: ignore
+        call.add_callback(lambda: callsite.end(None))  # type: ignore
 
         class Proxy:
             def __iter__(self) -> Iterator[_U]:
@@ -240,9 +179,9 @@ class AioUnaryUnaryInterceptor(grpc.aio.UnaryUnaryClientInterceptor):  # type: i
         client_call_details: ClientCallDetails,
         request: _T,
     ) -> _U:
-        callsite = CallSite(self.device, client_call_details.method, request)
+        callsite = Callsite(self.device, client_call_details.method, request)
         response = await (await continuation(client_call_details, request))
-        callsite.complete(response)
+        callsite.end(response)
         return response
 
 
@@ -256,8 +195,9 @@ class AioUnaryStreamInterceptor(grpc.aio.UnaryStreamClientInterceptor):  # type:
         client_call_details: ClientCallDetails,
         request: _T,
     ) -> utils.AioStream[_U]:
-        callsite = CallSite(self.device, client_call_details.method, request)
+        callsite = Callsite(self.device, client_call_details.method, request)
         call = await continuation(client_call_details, request)
+        call.add_done_callback(lambda _: callsite.end(None))  # type: ignore
         iter = aiter(call)
 
         class Proxy:
@@ -266,7 +206,7 @@ class AioUnaryStreamInterceptor(grpc.aio.UnaryStreamClientInterceptor):  # type:
 
             async def __anext__(self) -> _U:
                 res = await anext(iter)
-                callsite.complete(res)
+                callsite.input(res)
                 return res
 
             def is_active(self) -> bool:
@@ -278,8 +218,8 @@ class AioUnaryStreamInterceptor(grpc.aio.UnaryStreamClientInterceptor):  # type:
             def cancel(self) -> None:
                 return call.cancel()  # type: ignore
 
-            def add_callback(self, callback: Any) -> None:
-                return call.add_callback(callback)  # type: ignore
+            def add_done_callback(self, callback: Any) -> None:
+                return call.add_done_callback(callback)  # type: ignore
 
         return Proxy()  # type: ignore
 
@@ -294,7 +234,7 @@ class AioStreamStreamInterceptor(grpc.aio.StreamStreamClientInterceptor):  # typ
         client_call_details: ClientCallDetails,
         request: utils.AioSender[_T],
     ) -> utils.AioStreamStream[_T, _U]:
-        callsite = CallSite(self.device, client_call_details.method, None)
+        callsite = Callsite(self.device, client_call_details.method, None)
 
         class RequestProxy:
             def __aiter__(self) -> AsyncIterator[_T]:
@@ -306,6 +246,7 @@ class AioStreamStreamInterceptor(grpc.aio.StreamStreamClientInterceptor):  # typ
                 return req
 
         call = await continuation(client_call_details, RequestProxy())  # type: ignore
+        call.add_done_callback(lambda _: callsite.end(None))  # type: ignore
         iter = aiter(call)
 
         class ResponseProxy:
@@ -326,22 +267,7 @@ class AioStreamStreamInterceptor(grpc.aio.StreamStreamClientInterceptor):  # typ
             def cancel(self) -> None:
                 return call.cancel()  # type: ignore
 
-            def add_callback(self, callback: Any) -> None:
-                return call.add_callback(callback)  # type: ignore
+            def add_done_callback(self, callback: Any) -> None:
+                return call.add_done_callback(callback)  # type: ignore
 
         return ResponseProxy()  # type: ignore
-
-
-def message_prettifier(msg: str) -> str:
-    msg = msg.replace("{\n", "{").replace("\n", ",").replace(" ", "").replace(",}", "}")
-    msg = re.sub(r"{cookie{value:(\"[^\"]+\")}}", lambda m: f":{m.groups()[0]}", msg)
-
-    def repl(addr: re.Match[str]) -> str:
-        m = CUnescape(addr.groups()[0])
-        if len(m) > 8:
-            return ":'...'"
-        if len(m) == 4 and m[0] == 0 and m[1] == 0:
-            m = m[2:]
-        return ":'" + ':'.join([f'{x:02X}' for x in m]) + "'"
-
-    return re.sub(r":\"([^\"]+)\"", repl, msg)[:-1]

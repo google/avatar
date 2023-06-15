@@ -65,7 +65,7 @@ ignore_missing_imports = true
 
 [tool.pyright]
 include = ["avatar", "cases"]
-exclude = ["**/__pycache__"]
+exclude = ["**/__pycache__", "**/*_pb2.py"]
 typeCheckingMode = "strict"
 useLibraryCodeForTypes = true
 verboseOutput = false

@@ -121,7 +121,9 @@ class PandoraDevices(Sized, Iterable[PandoraDevice]):
         if len(self._clients):
             return
         for server in self._servers:
-            self._clients.append(server.start())
+            client = server.start()
+            client.test = self._test
+            self._clients.append(client)
 
     def stop_all(self) -> None:
         """Closes all opened Pandora clients and servers."""
