@@ -10,10 +10,10 @@ classifiers = [
 ]
 dependencies = [
     "bt-test-interfaces",
-    "bumble==0.0.162",
-    "protobuf>=4.22.0",
-    "grpcio>=1.51.1",
-    "mobly>=1.12",
+    "bumble==0.0.170",
+    "protobuf==4.24.2",
+    "grpcio==1.57",
+    "mobly==1.12.2",
     "portpicker>=1.5.2",
 ]
 
@@ -22,23 +22,22 @@ Source = "https://github.com/google/avatar"
 
 [project.optional-dependencies]
 dev = [
-    "grpcio-tools>=1.51.1",
-    "black==22.10.0",
+    "grpcio-tools>=1.57",
     "pyright==1.1.298",
-    "mypy==1.0",
+    "black==23.7.0",
     "isort==5.12.0",
-    "types-psutil>=5.9.5.6",
-    "types-setuptools>=65.7.0.3",
-    "types-protobuf>=4.21.0.3"
+    "types-psutil==5.9.5.16",
+    "types-setuptools==68.1.0.1",
+    "types-protobuf==4.24.0.1"
 ]
+
+[tool.flit.module]
+name = "avatar"
 
 [tool.black]
 line-length = 119
 target-version = ["py38", "py39", "py310", "py311"]
 skip-string-normalization = true
-
-[tool.flit.module]
-name = "avatar"
 
 [tool.isort]
 profile = "black"
@@ -47,27 +46,6 @@ no_sections = true
 lines_between_types = 1
 force_single_line = true
 single_line_exclusions = ["typing", "typing_extensions", "collections.abc"]
-
-[tool.mypy]
-strict = true
-warn_unused_ignores = false
-files = ["avatar", "cases"]
-
-[[tool.mypy.overrides]]
-module = "grpc.*"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "google.protobuf.*"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "mobly.*"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "portpicker.*"
-ignore_missing_imports = true
 
 [tool.pyright]
 include = ["avatar", "cases"]
@@ -78,6 +56,7 @@ verboseOutput = false
 reportMissingTypeStubs = false
 reportUnknownLambdaType = false
 reportImportCycles = false
+reportPrivateUsage = false
 
 [tool.pytype]
 inputs = ['avatar', 'cases']

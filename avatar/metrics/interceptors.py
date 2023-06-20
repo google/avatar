@@ -193,7 +193,6 @@ class AioUnaryStreamInterceptor(grpc.aio.UnaryStreamClientInterceptor):  # type:
         client_call_details: ClientCallDetails,
         request: _T,
     ) -> utils.AioStream[_U]:
-
         # TODO: this is a workaround for https://github.com/grpc/grpc/pull/33951
         #  need to be deleted as soon as `grpcio` contains the fix.
         now = time.time()
@@ -241,7 +240,6 @@ class AioStreamStreamInterceptor(grpc.aio.StreamStreamClientInterceptor):  # typ
         client_call_details: ClientCallDetails,
         request: utils.AioSender[_T],
     ) -> utils.AioStreamStream[_T, _U]:
-
         # TODO: this is a workaround for https://github.com/grpc/grpc/pull/33951
         #  need to be deleted as soon as `grpcio` contains the fix.
         now = time.time()

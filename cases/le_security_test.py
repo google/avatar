@@ -20,7 +20,6 @@ import logging
 from avatar import BumblePandoraDevice
 from avatar import PandoraDevice
 from avatar import PandoraDevices
-from avatar.common import make_bredr_connection
 from bumble.pairing import PairingConfig
 from bumble.pairing import PairingDelegate
 from mobly import base_test
@@ -41,6 +40,7 @@ from pandora.security_pb2 import PairingEventAnswer
 from pandora.security_pb2 import SecureResponse
 from pandora.security_pb2 import WaitSecurityResponse
 from typing import Any, Literal, Optional, Tuple, Union
+from utils import make_bredr_connection
 
 
 class LeSecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
@@ -121,7 +121,6 @@ class LeSecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
             Literal['ltk_irk_csrk_lk'],
         ],
     ) -> None:
-
         if self.dut.name == 'android' and connect == 'outgoing_connection' and pair == 'incoming_pairing':
             # TODO: do not skip when doing physical tests.
             raise signals.TestSkip('TODO: Yet to implement the test cases:\n')
@@ -137,11 +136,11 @@ class LeSecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
                 + '- When disconnected the `Secure/WaitSecurity` never returns.'
             )
 
+        if self.dut.name == 'android' and 'reject' in variant:
+            raise signals.TestSkip('TODO: Currently these scnearios are not working. Working on them.')
+
         if self.ref.name == 'android' and ref_address_type_name == 'against_public':
             raise signals.TestSkip('Android does not support PUBLIC address type.')
-
-        if 'reject' in variant or 'rejected' in variant:
-            raise signals.TestSkip('TODO: Currently these scnearios are not working. Working on them.')
 
         if isinstance(self.ref, BumblePandoraDevice) and ref_io_capability == 'against_default_io_cap':
             raise signals.TestSkip('Skip default IO cap for Bumble REF.')
@@ -211,7 +210,6 @@ class LeSecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
                 initiator_addr_type: OwnAddressType,
                 acceptor_addr_type: OwnAddressType,
             ) -> Tuple[Connection, Connection]:
-
                 # Acceptor - Advertise
                 advertisement = acceptor.aio.host.Advertise(
                     legacy=True,

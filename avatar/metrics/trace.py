@@ -263,7 +263,7 @@ def debug_value(v: Any) -> Tuple[Any, Dict[str, Any]]:
 def debug_message(msg: message.Message) -> Tuple[Dict[str, Any], List[DebugAnnotation]]:
     json: Dict[str, Any] = {}
     dbga: List[DebugAnnotation] = []
-    for (f, v) in msg.ListFields():
+    for f, v in msg.ListFields():
         if (
             isinstance(v, bytes)
             and len(v) == 6
