@@ -19,6 +19,7 @@ import asyncio
 import avatar.aio
 import grpc
 import grpc.aio
+import portpicker
 import threading
 import types
 
@@ -32,7 +33,7 @@ from mobly.controllers.android_device import AndroidDevice
 from typing import Generic, Optional, TypeVar
 
 ANDROID_SERVER_PACKAGE = 'com.android.pandora'
-ANDROID_SERVER_GRPC_PORT = 8999  # TODO: Use a dynamic port
+ANDROID_SERVER_GRPC_PORT = 8999
 
 
 # Generic type for `PandoraServer`.
@@ -108,13 +109,14 @@ class AndroidPandoraServer(PandoraServer[AndroidDevice]):
     MOBLY_CONTROLLER_MODULE = android_device
 
     _instrumentation: Optional[threading.Thread] = None
-    _port: int = ANDROID_SERVER_GRPC_PORT
+    _port: int
 
     def start(self) -> PandoraClient:
         """Sets up and starts the Pandora server on the Android device."""
         assert self._instrumentation is None
 
         # start Pandora Android gRPC server.
+        self._port = portpicker.pick_unused_port()  # type: ignore
         self._instrumentation = threading.Thread(
             target=lambda: self.device.adb._exec_adb_cmd(  # type: ignore
                 'shell',
@@ -139,6 +141,6 @@ class AndroidPandoraServer(PandoraServer[AndroidDevice]):
             'shell', f'am force-stop {ANDROID_SERVER_PACKAGE}', shell=False, timeout=None, stderr=None
         )
 
-        self.device.adb.forward(['--remove', f'tcp:{ANDROID_SERVER_GRPC_PORT}'])  # type: ignore
+        self.device.adb.forward(['--remove', f'tcp:{self._port}'])  # type: ignore
         self._instrumentation.join()
         self._instrumentation = None
