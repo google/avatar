@@ -1,0 +1,37 @@
+name: Python Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set Up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install .
+      - name: Rootcanal
+        run: |
+          ls -la /lib/x86_64-linux-gnu/
+          file ./tools/rootcanal
+          ldd ./tools/rootcanal
+          ./tools/rootcanal
+      - name: Host Tests
+        uses: BerniWittmann/background-server-action@v1
+        with:
+          start: ls -la && ls -la tools && pwd && ./tools/rootcanal
+          command: python cases/host_test.py -c cases/config.yml --test_bed bumble.bumbles
+      - name: LE Host Tests
+        uses: BerniWittmann/background-server-action@v1
+        with:
+          start: ls -la &&  ls -la tools && pwd && ./tools/rootcanal
+          command: python cases/le_host_test.py -c cases/config.yml --test_bed bumble.bumbles

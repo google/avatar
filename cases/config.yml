@@ -10,6 +10,6 @@ TestBeds:
 - Name: bumble.bumbles
   Controllers:
     BumbleDevice:
-    - transport: 'tcp-client:127.0.0.1:7300'
-    - transport: 'tcp-client:127.0.0.1:7300'
-    - transport: 'tcp-client:127.0.0.1:7300'
+    - transport: 'tcp-client:127.0.0.1:6402'
+    - transport: 'tcp-client:127.0.0.1:6402'
+    - transport: 'tcp-client:127.0.0.1:6402'
