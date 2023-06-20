@@ -1,0 +1,92 @@
+name: Avatar
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Build with Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11"]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set Up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: |
+          pip install --upgrade pip
+          pip install build
+          pip install .
+      - name: Build
+        run: python -m build
+  lint:
+    name: Lint for Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11"]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set Up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: pip install .[dev]
+      - run: pyright
+  format:
+    name: Check Python formatting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set Up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+      - name: Install
+        run: |
+          pip install --upgrade pip
+          pip install .[dev]
+      - run: black --check avatar/ cases/
+      - run: isort --check avatar/ cases/
+  test:
+    name: Test Bumble vs Bumble(s) [${{ matrix.shard }}]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shard: [
+           1/24,  2/24,  3/24,  4/24,
+           5/24,  6/24,  7/24,  8/24,
+           9/24, 10/24, 11/24, 12/24,
+          13/24, 14/24, 15/24, 16/24,
+          17/24, 18/24, 19/24, 20/24,
+          21/24, 22/24, 23/24, 24/24,
+        ]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set Up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+      - name: Install
+        run: |
+          pip install --upgrade pip
+          pip install .
+      - name: Rootcanal
+        run: |
+          wget https://github.com/google/rootcanal/releases/download/v1.0.0/rootcanal-v1.0.0-linux-x86_64.zip
+          unzip rootcanal-v1.0.0-linux-x86_64.zip
+          nohup ./bin/rootcanal > rootcanal.log &
+      - name: Test
+        run: |
+          python cases/main.py -l | grep -Ev '^=' > test-names.txt
+          timeout 5m python cases/main.py -c cases/config.yml --test_bed bumble.bumbles --tests $(split test-names.txt -n l/${{ matrix.shard }})
+      - name: Rootcanal Logs
+        run: cat rootcanal.log

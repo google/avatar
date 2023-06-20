@@ -181,7 +181,7 @@ class LeHostTest(base_test.BaseTestClass):  # type: ignore[misc]
 
         assert_true(report.legacy, msg='expected legacy advertising report')
         assert_equal(report.connectable, True)
-        for (key, value) in data.items():
+        for key, value in data.items():
             assert_equal(getattr(report.data, key), value)  # type: ignore[misc]
         assert_false(report.truncated, msg='expected non-truncated advertising report')
 

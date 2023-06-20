@@ -20,7 +20,6 @@ import logging
 from avatar import BumblePandoraDevice
 from avatar import PandoraDevice
 from avatar import PandoraDevices
-from avatar.common import make_bredr_connection
 from bumble.hci import HCI_CENTRAL_ROLE
 from bumble.hci import HCI_PERIPHERAL_ROLE
 from bumble.hci import HCI_Write_Default_Link_Policy_Settings_Command
@@ -44,6 +43,7 @@ from pandora.security_pb2 import PairingEventAnswer
 from pandora.security_pb2 import SecureResponse
 from pandora.security_pb2 import WaitSecurityResponse
 from typing import Any, List, Literal, Optional, Tuple, Union
+from utils import make_bredr_connection
 
 DEFAULT_SMP_KEY_DISTRIBUTION = (
     PairingDelegate.KeyDistribution.DISTRIBUTE_ENCRYPTION_KEY
@@ -450,7 +450,6 @@ class SecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
         ctkd_shall_pass = variant == 'accept_ctkd'
 
         if variant == 'accept_ctkd':
-
             # TODO: Remove direct Bumble usage
             async def ctkd_over_bredr() -> None:
                 if ref_role == 'against_central':
