@@ -28,6 +28,9 @@ message TracePacket {
     TrackEvent track_event = 11;
     TrackDescriptor track_descriptor = 60;
   }
+  oneof optional_trusted_packet_sequence_id {
+    uint32 trusted_packet_sequence_id = 10;
+  }
 }
 
 message TrackDescriptor {
@@ -35,6 +38,7 @@ message TrackDescriptor {
   optional uint64 parent_uuid = 5;
   optional string name = 2;
   optional ProcessDescriptor process = 3;
+  optional ThreadDescriptor thread = 4;
 }
 
 message TrackEvent {
@@ -52,8 +56,16 @@ message TrackEvent {
 }
 
 message ProcessDescriptor {
+  optional int32 pid = 1;
   optional string process_name = 6;
   repeated string process_labels = 8;
+}
+
+message ThreadDescriptor {
+  optional int32 pid = 1;
+  optional int32 tid = 2;
+
+  optional string thread_name = 5;
 }
 
 message DebugAnnotation {

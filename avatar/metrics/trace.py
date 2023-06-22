@@ -21,6 +21,7 @@ import types
 from avatar.metrics.trace_pb2 import (
     DebugAnnotation,
     ProcessDescriptor,
+    ThreadDescriptor,
     Trace,
     TracePacket,
     TrackDescriptor,
@@ -28,7 +29,7 @@ from avatar.metrics.trace_pb2 import (
 )
 from google.protobuf.text_encoding import CUnescape
 from mobly.base_test import BaseTestClass
-from typing import TYPE_CHECKING, Any, List, Optional, Protocol, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Protocol, Union
 
 if TYPE_CHECKING:
     from avatar.pandora_client import PandoraClient
@@ -36,9 +37,11 @@ else:
     PandoraClient = object
 
 
-test_uuid_counter = 0
-test: Optional[TrackDescriptor] = None
+track_uuid_counter = 0
 packets: List[TracePacket] = []
+device_track_uuids: Dict[PandoraClient, int] = {}
+processes_id: Dict[str, int] = {}
+is_teardown_override: bool = False
 
 
 class AsTrace(Protocol):
@@ -55,40 +58,57 @@ class Callsite(AsTrace):
         return cls.id_counter
 
     def __init__(self, device: PandoraClient, name: Union[bytes, str], message: Any) -> None:
-        self.at = time.perf_counter()
-        self.name = device.name + '.' + (name if isinstance(name, str) else name.decode('utf-8'))
+        self.at = time.perf_counter_ns()
+        self.name = name if isinstance(name, str) else name.decode('utf-8')
         self.device = device
         self.message = message
         self.events: List[CallEvent] = []
-
-        current_process = device.test.__class__.__name__
-        current_test: str = device.test.current_test_info.name
-
-        global test, packets, test_uuid_counter
-        if test is None or test.process.process_name != current_process or test.name != current_test:
-            if test is None:
-                original_teardown_class = device.test.__class__.teardown_class
-
-                def teardown_class(self: BaseTestClass) -> None:
-                    output_path: str = device.test.current_test_info.output_path  # type: ignore
-                    trace = Trace(packet=packets)
-                    with open(f"{output_path}/avatar.trace", "wb") as f:
-                        f.write(trace.SerializeToString())
-                    original_teardown_class(self)
-
-                device.test.__class__.teardown_class = types.MethodType(teardown_class, device.test)
-
-            Callsite.id_counter = 0
-            test_uuid_counter += 1
-            uuid = test_uuid_counter
-            test = TrackDescriptor(
-                uuid=uuid, name=current_test, process=ProcessDescriptor(process_name=current_process)
-            )
-            packets.append(TracePacket(timestamp=(int)(self.at * 1000), track_descriptor=test))
-
         self.id = Callsite.next_id()
 
-        device.log.info(f"{self}\n{self.as_trace()}")
+        current_test: str = device.test.current_test_info.name
+        current_process = f"{device.test.__class__.__name__}.{current_test}"
+
+        global device_track_uuids, packets, track_uuid_counter, is_teardown_override, processes_id
+        if not is_teardown_override:
+            is_teardown_override = True
+            original_teardown_class = device.test.__class__.teardown_class
+
+            def teardown_class(self: BaseTestClass) -> None:
+                output_path: str = device.test.current_test_info.output_path  # type: ignore
+                trace = Trace(packet=packets)
+                with open(f"{output_path}/avatar.trace", "wb") as f:
+                    f.write(trace.SerializeToString())
+                original_teardown_class(self)
+
+            device.test.__class__.teardown_class = types.MethodType(teardown_class, device.test)
+
+        if current_process not in processes_id:
+            Callsite.id_counter = 0
+            self.id = Callsite.next_id()
+            processes_id[current_process] = hash(current_process) & 0xFFFF
+            packets.append(
+                TracePacket(
+                    track_descriptor=TrackDescriptor(
+                        uuid=processes_id[current_process],
+                        process=ProcessDescriptor(pid=1, process_name=current_process),
+                    )
+                )
+            )
+            device_track_uuids.clear()
+
+        if device not in device_track_uuids:
+
+            track_uuid_counter += 1
+            uuid = track_uuid_counter
+            device_track_uuids[device] = uuid
+            descriptor = TrackDescriptor(
+                uuid=uuid,
+                parent_uuid=processes_id[current_process],
+                thread=ThreadDescriptor(thread_name=device.name, pid=1, tid=id(device) & 0xFFFF),
+            )
+            packets.append(TracePacket(track_descriptor=descriptor))
+
+        device.log.info(f"{self}")
 
     def __str__(self) -> str:
         name_pretty = self.name[1:].replace('/', '.')
@@ -111,46 +131,50 @@ class Callsite(AsTrace):
             packets.append(event.as_trace())
 
     def as_trace(self) -> TracePacket:
+        global device_track_uuids
         return TracePacket(
-            timestamp=(int)(self.at * 1000),
+            timestamp=self.at,
             track_event=TrackEvent(
                 name=self.name,
                 type=TrackEvent.Type.TYPE_SLICE_BEGIN,
-                track_uuid=test_uuid_counter,
+                track_uuid=device_track_uuids[self.device],
                 debug_annotations=None
                 if self.message is None
                 else [DebugAnnotation(string_value=message_prettifier(f"{self.message}"))],
             ),
+            trusted_packet_sequence_id=1,
         )
 
 
 class CallEvent(AsTrace):
     def __init__(self, callsite: Callsite, message: Any) -> None:
-        self.at = time.perf_counter()
+        self.at = time.perf_counter_ns()
         self.callsite = callsite
         self.message = message
 
-        callsite.device.log.info(f"{self}\n{self.as_trace()}")
+        callsite.device.log.info(f"{self}")
 
     def __str__(self) -> str:
         return "└── " + self.stringify('->')
 
     def as_trace(self) -> TracePacket:
+        global device_track_uuids
         return TracePacket(
-            timestamp=(int)(self.at * 1000),
+            timestamp=self.at,
             track_event=TrackEvent(
                 name=self.callsite.name,
                 type=TrackEvent.Type.TYPE_INSTANT,
-                track_uuid=test_uuid_counter,
+                track_uuid=device_track_uuids[self.callsite.device],
                 debug_annotations=None
                 if self.message is None
                 else [DebugAnnotation(string_value=message_prettifier(f"{self.message}"))],
             ),
+            trusted_packet_sequence_id=1,
         )
 
     def stringify(self, direction: str) -> str:
         message_pretty = message_prettifier(f"{self.message}")
-        return f"[{self.at - self.callsite.at:.3f}s] {self.callsite} {direction} ({message_pretty})"
+        return f"[{(self.at - self.callsite.at) / 1000000000:.3f}s] {self.callsite} {direction} ({message_pretty})"
 
 
 class CallOutput(CallEvent):
@@ -174,16 +198,18 @@ class CallEnd(CallEvent):
         return "└── " + self.stringify('->')
 
     def as_trace(self) -> TracePacket:
+        global device_track_uuids
         return TracePacket(
-            timestamp=(int)(self.at * 1000),
+            timestamp=self.at,
             track_event=TrackEvent(
                 name=self.callsite.name,
                 type=TrackEvent.Type.TYPE_SLICE_END,
-                track_uuid=test_uuid_counter,
+                track_uuid=device_track_uuids[self.callsite.device],
                 debug_annotations=None
                 if self.message is None
                 else [DebugAnnotation(string_value=message_prettifier(f"{self.message}"))],
             ),
+            trusted_packet_sequence_id=1,
         )
 
 

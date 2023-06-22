@@ -11,36 +11,42 @@ class Trace(_message.Message):
     def __init__(self, packet: _Optional[_Iterable[TracePacket]] = ...) -> None: ...
 
 class TracePacket(_message.Message):
-    __slots__ = ["timestamp", "track_event", "track_descriptor"]
+    __slots__ = ["timestamp", "track_event", "track_descriptor", "trusted_packet_sequence_id"]
     TIMESTAMP_FIELD_NUMBER: _ClassVar[int]
     TRACK_EVENT_FIELD_NUMBER: _ClassVar[int]
     TRACK_DESCRIPTOR_FIELD_NUMBER: _ClassVar[int]
+    TRUSTED_PACKET_SEQUENCE_ID_FIELD_NUMBER: _ClassVar[int]
     timestamp: int
     track_event: TrackEvent
     track_descriptor: TrackDescriptor
+    trusted_packet_sequence_id: int
     def __init__(
         self,
         timestamp: _Optional[int] = ...,
         track_event: _Optional[TrackEvent] = ...,
         track_descriptor: _Optional[TrackDescriptor] = ...,
+        trusted_packet_sequence_id: _Optional[int] = ...,
     ) -> None: ...
 
 class TrackDescriptor(_message.Message):
-    __slots__ = ["uuid", "parent_uuid", "name", "process"]
+    __slots__ = ["uuid", "parent_uuid", "name", "process", "thread"]
     UUID_FIELD_NUMBER: _ClassVar[int]
     PARENT_UUID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     PROCESS_FIELD_NUMBER: _ClassVar[int]
+    THREAD_FIELD_NUMBER: _ClassVar[int]
     uuid: int
     parent_uuid: int
     name: str
     process: ProcessDescriptor
+    thread: ThreadDescriptor
     def __init__(
         self,
         uuid: _Optional[int] = ...,
         parent_uuid: _Optional[int] = ...,
         name: _Optional[str] = ...,
         process: _Optional[ProcessDescriptor] = ...,
+        thread: _Optional[ThreadDescriptor] = ...,
     ) -> None: ...
 
 class TrackEvent(_message.Message):
@@ -75,13 +81,30 @@ class TrackEvent(_message.Message):
     ) -> None: ...
 
 class ProcessDescriptor(_message.Message):
-    __slots__ = ["process_name", "process_labels"]
+    __slots__ = ["pid", "process_name", "process_labels"]
+    PID_FIELD_NUMBER: _ClassVar[int]
     PROCESS_NAME_FIELD_NUMBER: _ClassVar[int]
     PROCESS_LABELS_FIELD_NUMBER: _ClassVar[int]
+    pid: int
     process_name: str
     process_labels: _containers.RepeatedScalarFieldContainer[str]
     def __init__(
-        self, process_name: _Optional[str] = ..., process_labels: _Optional[_Iterable[str]] = ...
+        self,
+        pid: _Optional[int] = ...,
+        process_name: _Optional[str] = ...,
+        process_labels: _Optional[_Iterable[str]] = ...,
+    ) -> None: ...
+
+class ThreadDescriptor(_message.Message):
+    __slots__ = ["pid", "tid", "thread_name"]
+    PID_FIELD_NUMBER: _ClassVar[int]
+    TID_FIELD_NUMBER: _ClassVar[int]
+    THREAD_NAME_FIELD_NUMBER: _ClassVar[int]
+    pid: int
+    tid: int
+    thread_name: str
+    def __init__(
+        self, pid: _Optional[int] = ..., tid: _Optional[int] = ..., thread_name: _Optional[str] = ...
     ) -> None: ...
 
 class DebugAnnotation(_message.Message):

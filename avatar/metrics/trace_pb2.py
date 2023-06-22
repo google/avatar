@@ -15,7 +15,7 @@ _sym_db = _symbol_database.Default()
 
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n\x0btrace.proto\x12\x0fperfetto.protos\"5\n\x05Trace\x12,\n\x06packet\x18\x01 \x03(\x0b\x32\x1c.perfetto.protos.TracePacket\"\x9a\x01\n\x0bTracePacket\x12\x11\n\ttimestamp\x18\x08 \x01(\x04\x12\x32\n\x0btrack_event\x18\x0b \x01(\x0b\x32\x1b.perfetto.protos.TrackEventH\x00\x12<\n\x10track_descriptor\x18< \x01(\x0b\x32 .perfetto.protos.TrackDescriptorH\x00\x42\x06\n\x04\x64\x61ta\"w\n\x0fTrackDescriptor\x12\x0c\n\x04uuid\x18\x01 \x01(\x04\x12\x13\n\x0bparent_uuid\x18\x05 \x01(\x04\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x33\n\x07process\x18\x03 \x01(\x0b\x32\".perfetto.protos.ProcessDescriptor\"\x87\x02\n\nTrackEvent\x12\x0c\n\x04name\x18\x17 \x02(\t\x12.\n\x04type\x18\t \x01(\x0e\x32 .perfetto.protos.TrackEvent.Type\x12\x12\n\ntrack_uuid\x18\x0b \x01(\x04\x12;\n\x11\x64\x65\x62ug_annotations\x18\x04 \x03(\x0b\x32 .perfetto.protos.DebugAnnotation\"j\n\x04Type\x12\x14\n\x10TYPE_UNSPECIFIED\x10\x00\x12\x14\n\x10TYPE_SLICE_BEGIN\x10\x01\x12\x12\n\x0eTYPE_SLICE_END\x10\x02\x12\x10\n\x0cTYPE_INSTANT\x10\x03\x12\x10\n\x0cTYPE_COUNTER\x10\x04\"A\n\x11ProcessDescriptor\x12\x14\n\x0cprocess_name\x18\x06 \x01(\t\x12\x16\n\x0eprocess_labels\x18\x08 \x03(\t\"\'\n\x0f\x44\x65\x62ugAnnotation\x12\x14\n\x0cstring_value\x18\x06 \x02(\t'
+    b'\n\x0btrace.proto\x12\x0fperfetto.protos\"5\n\x05Trace\x12,\n\x06packet\x18\x01 \x03(\x0b\x32\x1c.perfetto.protos.TracePacket\"\xe7\x01\n\x0bTracePacket\x12\x11\n\ttimestamp\x18\x08 \x01(\x04\x12\x32\n\x0btrack_event\x18\x0b \x01(\x0b\x32\x1b.perfetto.protos.TrackEventH\x00\x12<\n\x10track_descriptor\x18< \x01(\x0b\x32 .perfetto.protos.TrackDescriptorH\x00\x12$\n\x1atrusted_packet_sequence_id\x18\n \x01(\rH\x01\x42\x06\n\x04\x64\x61taB%\n#optional_trusted_packet_sequence_id\"\xaa\x01\n\x0fTrackDescriptor\x12\x0c\n\x04uuid\x18\x01 \x01(\x04\x12\x13\n\x0bparent_uuid\x18\x05 \x01(\x04\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x33\n\x07process\x18\x03 \x01(\x0b\x32\".perfetto.protos.ProcessDescriptor\x12\x31\n\x06thread\x18\x04 \x01(\x0b\x32!.perfetto.protos.ThreadDescriptor\"\x87\x02\n\nTrackEvent\x12\x0c\n\x04name\x18\x17 \x02(\t\x12.\n\x04type\x18\t \x01(\x0e\x32 .perfetto.protos.TrackEvent.Type\x12\x12\n\ntrack_uuid\x18\x0b \x01(\x04\x12;\n\x11\x64\x65\x62ug_annotations\x18\x04 \x03(\x0b\x32 .perfetto.protos.DebugAnnotation\"j\n\x04Type\x12\x14\n\x10TYPE_UNSPECIFIED\x10\x00\x12\x14\n\x10TYPE_SLICE_BEGIN\x10\x01\x12\x12\n\x0eTYPE_SLICE_END\x10\x02\x12\x10\n\x0cTYPE_INSTANT\x10\x03\x12\x10\n\x0cTYPE_COUNTER\x10\x04\"N\n\x11ProcessDescriptor\x12\x0b\n\x03pid\x18\x01 \x01(\x05\x12\x14\n\x0cprocess_name\x18\x06 \x01(\t\x12\x16\n\x0eprocess_labels\x18\x08 \x03(\t\"A\n\x10ThreadDescriptor\x12\x0b\n\x03pid\x18\x01 \x01(\x05\x12\x0b\n\x03tid\x18\x02 \x01(\x05\x12\x13\n\x0bthread_name\x18\x05 \x01(\t\"\'\n\x0f\x44\x65\x62ugAnnotation\x12\x14\n\x0cstring_value\x18\x06 \x02(\t'
 )
 
 _globals = globals()
@@ -27,15 +27,17 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _globals['_TRACE']._serialized_start = 32
     _globals['_TRACE']._serialized_end = 85
     _globals['_TRACEPACKET']._serialized_start = 88
-    _globals['_TRACEPACKET']._serialized_end = 242
-    _globals['_TRACKDESCRIPTOR']._serialized_start = 244
-    _globals['_TRACKDESCRIPTOR']._serialized_end = 363
-    _globals['_TRACKEVENT']._serialized_start = 366
-    _globals['_TRACKEVENT']._serialized_end = 629
-    _globals['_TRACKEVENT_TYPE']._serialized_start = 523
-    _globals['_TRACKEVENT_TYPE']._serialized_end = 629
-    _globals['_PROCESSDESCRIPTOR']._serialized_start = 631
-    _globals['_PROCESSDESCRIPTOR']._serialized_end = 696
-    _globals['_DEBUGANNOTATION']._serialized_start = 698
-    _globals['_DEBUGANNOTATION']._serialized_end = 737
+    _globals['_TRACEPACKET']._serialized_end = 319
+    _globals['_TRACKDESCRIPTOR']._serialized_start = 322
+    _globals['_TRACKDESCRIPTOR']._serialized_end = 492
+    _globals['_TRACKEVENT']._serialized_start = 495
+    _globals['_TRACKEVENT']._serialized_end = 758
+    _globals['_TRACKEVENT_TYPE']._serialized_start = 652
+    _globals['_TRACKEVENT_TYPE']._serialized_end = 758
+    _globals['_PROCESSDESCRIPTOR']._serialized_start = 760
+    _globals['_PROCESSDESCRIPTOR']._serialized_end = 838
+    _globals['_THREADDESCRIPTOR']._serialized_start = 840
+    _globals['_THREADDESCRIPTOR']._serialized_end = 905
+    _globals['_DEBUGANNOTATION']._serialized_start = 907
+    _globals['_DEBUGANNOTATION']._serialized_end = 946
 # @@protoc_insertion_point(module_scope)
