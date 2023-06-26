@@ -33,16 +33,23 @@ from typing import TYPE_CHECKING, Any, Dict, List, Protocol, Union
 
 if TYPE_CHECKING:
     from avatar.pandora_client import PandoraClient
+    from avatar import PandoraDevices
 else:
     PandoraClient = object
+    PandoraDevices = object
 
 
-track_uuid_counter = 0
 packets: List[TracePacket] = []
-device_track_uuids: Dict[PandoraClient, int] = {}
-processes_id: Dict[str, int] = {}
-is_teardown_override: bool = False
+is_class_method_override: bool = False
 
+def process_name(test: BaseTestClass) -> str:
+    return f"{test.__class__.__name__}.{test.current_test_info.name}"
+
+def process_id(test: BaseTestClass) -> int:
+    return hash(process_name(test)) & 0xFFFF
+
+def device_id(device: PandoraClient) -> int:
+    return (id(device) & 0xFFFF) | (process_id(device.test) << 0x4)
 
 class AsTrace(Protocol):
     def as_trace(self) -> TracePacket:
@@ -65,13 +72,11 @@ class Callsite(AsTrace):
         self.events: List[CallEvent] = []
         self.id = Callsite.next_id()
 
-        current_test: str = device.test.current_test_info.name
-        current_process = f"{device.test.__class__.__name__}.{current_test}"
-
-        global device_track_uuids, packets, track_uuid_counter, is_teardown_override, processes_id
-        if not is_teardown_override:
-            is_teardown_override = True
+        global packets, is_class_method_override
+        if not is_class_method_override:
+            is_class_method_override = True
             original_teardown_class = device.test.__class__.teardown_class
+            original_setup_test = device.test.__class__.setup_test
 
             def teardown_class(self: BaseTestClass) -> None:
                 output_path: str = device.test.current_test_info.output_path  # type: ignore
@@ -80,33 +85,31 @@ class Callsite(AsTrace):
                     f.write(trace.SerializeToString())
                 original_teardown_class(self)
 
-            device.test.__class__.teardown_class = types.MethodType(teardown_class, device.test)
 
-        if current_process not in processes_id:
-            Callsite.id_counter = 0
-            self.id = Callsite.next_id()
-            processes_id[current_process] = hash(current_process) & 0xFFFF
-            packets.append(
-                TracePacket(
-                    track_descriptor=TrackDescriptor(
-                        uuid=processes_id[current_process],
-                        process=ProcessDescriptor(pid=1, process_name=current_process),
+            def setup_test(self: BaseTestClass) -> None:
+                assert hasattr(self, "devices")
+                devices: PandoraDevices = getattr(self, "devices", [])
+                packets.append(
+                    TracePacket(
+                        track_descriptor=TrackDescriptor(
+                            uuid=process_id(self),
+                            process=ProcessDescriptor(pid=1, process_name=process_name(self)),
+                        )
                     )
                 )
-            )
-            device_track_uuids.clear()
 
-        if device not in device_track_uuids:
+                for device in devices:
+                    descriptor = TrackDescriptor(
+                        uuid=device_id(device),
+                        parent_uuid=process_id(self),
+                        thread=ThreadDescriptor(thread_name=device.name, pid=1, tid=id(device) & 0xFFFF),
+                    )
+                    packets.append(TracePacket(track_descriptor=descriptor))
 
-            track_uuid_counter += 1
-            uuid = track_uuid_counter
-            device_track_uuids[device] = uuid
-            descriptor = TrackDescriptor(
-                uuid=uuid,
-                parent_uuid=processes_id[current_process],
-                thread=ThreadDescriptor(thread_name=device.name, pid=1, tid=id(device) & 0xFFFF),
-            )
-            packets.append(TracePacket(track_descriptor=descriptor))
+                original_setup_test(self)
+
+            device.test.__class__.teardown_class = types.MethodType(teardown_class, device.test)
+            device.test.__class__.setup_test =  types.MethodType(setup_test, device.test)
 
         device.log.info(f"{self}")
 
@@ -131,13 +134,12 @@ class Callsite(AsTrace):
             packets.append(event.as_trace())
 
     def as_trace(self) -> TracePacket:
-        global device_track_uuids
         return TracePacket(
             timestamp=self.at,
             track_event=TrackEvent(
                 name=self.name,
                 type=TrackEvent.Type.TYPE_SLICE_BEGIN,
-                track_uuid=device_track_uuids[self.device],
+                track_uuid=device_id(self.device),
                 debug_annotations=None
                 if self.message is None
                 else [DebugAnnotation(string_value=message_prettifier(f"{self.message}"))],
@@ -158,13 +160,12 @@ class CallEvent(AsTrace):
         return "└── " + self.stringify('->')
 
     def as_trace(self) -> TracePacket:
-        global device_track_uuids
         return TracePacket(
             timestamp=self.at,
             track_event=TrackEvent(
                 name=self.callsite.name,
                 type=TrackEvent.Type.TYPE_INSTANT,
-                track_uuid=device_track_uuids[self.callsite.device],
+                track_uuid=device_id(self.callsite.device),
                 debug_annotations=None
                 if self.message is None
                 else [DebugAnnotation(string_value=message_prettifier(f"{self.message}"))],
@@ -198,13 +199,12 @@ class CallEnd(CallEvent):
         return "└── " + self.stringify('->')
 
     def as_trace(self) -> TracePacket:
-        global device_track_uuids
         return TracePacket(
             timestamp=self.at,
             track_event=TrackEvent(
                 name=self.callsite.name,
                 type=TrackEvent.Type.TYPE_SLICE_END,
-                track_uuid=device_track_uuids[self.callsite.device],
+                track_uuid=device_id(self.callsite.device),
                 debug_annotations=None
                 if self.message is None
                 else [DebugAnnotation(string_value=message_prettifier(f"{self.message}"))],
