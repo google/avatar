@@ -41,15 +41,21 @@ else:
 
 packets: List[TracePacket] = []
 genesis: int = time.monotonic_ns()
+process_id: int = 0
+device_id: int = 0
 
 def process_name(test: BaseTestClass) -> str:
     return f"{test.__class__.__name__}.{test.current_test_info.name}"
 
-def process_id(test: BaseTestClass) -> int:
-    return hash(process_name(test)) & 0xFFFF
+def next_process_id() -> int:
+    global process_id
+    process_id += 1
+    return process_id
 
-def device_id(device: PandoraClient) -> int:
-    return (id(device) & 0xFFFF) | (process_id(device.test) << 0x4)
+def next_device_id() -> int:
+    global device_id
+    device_id += 1
+    return device_id
 
 def hook_test(test: BaseTestClass) -> None:
     global packets
@@ -70,24 +76,25 @@ def hook_test(test: BaseTestClass) -> None:
 
 
     def setup_test(self: BaseTestClass) -> None:
-        global genesis
+        global genesis, process_id
         genesis = time.monotonic_ns()
         assert hasattr(self, "devices")
         devices: PandoraDevices = getattr(self, "devices", [])
         packets.append(
             TracePacket(
                 track_descriptor=TrackDescriptor(
-                    uuid=process_id(self),
-                    process=ProcessDescriptor(pid=process_id(self), process_name=process_name(self)),
+                    uuid=next_process_id(),
+                    process=ProcessDescriptor(pid=process_id, process_name=process_name(self)),
                 )
             )
         )
 
         for device in devices:
+            device.uuid = next_device_id()
             descriptor = TrackDescriptor(
-                uuid=device_id(device),
-                parent_uuid=process_id(self),
-                thread=ThreadDescriptor(thread_name=device.name, pid=process_id(self), tid=device_id(device)),
+                uuid=device.uuid,
+                parent_uuid=process_id,
+                thread=ThreadDescriptor(thread_name=device.name, pid=process_id, tid=device.uuid),
             )
             packets.append(TracePacket(track_descriptor=descriptor))
 
@@ -145,12 +152,12 @@ class Callsite(AsTrace):
             track_event=TrackEvent(
                 name=self.name,
                 type=TrackEvent.Type.TYPE_SLICE_BEGIN,
-                track_uuid=device_id(self.device),
+                track_uuid=self.device.uuid,
                 debug_annotations=None
                 if self.message is None
                 else [DebugAnnotation(string_value=message_prettifier(f"{self.message}"))],
             ),
-            trusted_packet_sequence_id=process_id(self.device.test),
+            trusted_packet_sequence_id=process_id,
         )
 
 
@@ -171,12 +178,12 @@ class CallEvent(AsTrace):
             track_event=TrackEvent(
                 name=self.callsite.name,
                 type=TrackEvent.Type.TYPE_INSTANT,
-                track_uuid=device_id(self.callsite.device),
+                track_uuid=self.callsite.device.uuid,
                 debug_annotations=None
                 if self.message is None
                 else [DebugAnnotation(string_value=message_prettifier(f"{self.message}"))],
             ),
-            trusted_packet_sequence_id=process_id(self.callsite.device.test),
+            trusted_packet_sequence_id=process_id,
         )
 
     def stringify(self, direction: str) -> str:
@@ -210,12 +217,12 @@ class CallEnd(CallEvent):
             track_event=TrackEvent(
                 name=self.callsite.name,
                 type=TrackEvent.Type.TYPE_SLICE_END,
-                track_uuid=device_id(self.callsite.device),
+                track_uuid=self.callsite.device.uuid,
                 debug_annotations=None
                 if self.message is None
                 else [DebugAnnotation(string_value=message_prettifier(f"{self.message}"))],
             ),
-            trusted_packet_sequence_id=process_id(self.callsite.device.test),
+            trusted_packet_sequence_id=process_id,
         )
 
 
