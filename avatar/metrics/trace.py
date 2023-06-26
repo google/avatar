@@ -40,7 +40,6 @@ else:
 
 
 packets: List[TracePacket] = []
-is_class_method_override: bool = False
 
 def process_name(test: BaseTestClass) -> str:
     return f"{test.__class__.__name__}.{test.current_test_info.name}"
@@ -50,6 +49,49 @@ def process_id(test: BaseTestClass) -> int:
 
 def device_id(device: PandoraClient) -> int:
     return (id(device) & 0xFFFF) | (process_id(device.test) << 0x4)
+
+def hook_test(test: BaseTestClass) -> None:
+    global packets
+    original_teardown_class = test.__class__.teardown_class
+    original_setup_test = test.__class__.setup_test
+
+    def teardown_class(self: BaseTestClass) -> None:
+        output_path: str = test.current_test_info.output_path  # type: ignore
+        trace = Trace(packet=packets)
+        with open(f"{output_path}/avatar.trace", "wb") as f:
+            f.write(trace.SerializeToString())
+        with open(f"{output_path}/packets.log", "a") as f:
+            for packet in packets:
+                f.write(f"{packet}")
+                f.write("----------\n")
+
+        original_teardown_class(self)
+
+
+    def setup_test(self: BaseTestClass) -> None:
+        assert hasattr(self, "devices")
+        devices: PandoraDevices = getattr(self, "devices", [])
+        packets.append(
+            TracePacket(
+                track_descriptor=TrackDescriptor(
+                    uuid=process_id(self),
+                    process=ProcessDescriptor(pid=1, process_name=process_name(self)),
+                )
+            )
+        )
+
+        for device in devices:
+            descriptor = TrackDescriptor(
+                uuid=device_id(device),
+                parent_uuid=process_id(self),
+                thread=ThreadDescriptor(thread_name=device.name, pid=1, tid=id(device) & 0xFFFF),
+            )
+            packets.append(TracePacket(track_descriptor=descriptor))
+
+        original_setup_test(self)
+
+    test.__class__.teardown_class = types.MethodType(teardown_class, test)
+    test.__class__.setup_test =  types.MethodType(setup_test, test)
 
 class AsTrace(Protocol):
     def as_trace(self) -> TracePacket:
@@ -71,45 +113,6 @@ class Callsite(AsTrace):
         self.message = message
         self.events: List[CallEvent] = []
         self.id = Callsite.next_id()
-
-        global packets, is_class_method_override
-        if not is_class_method_override:
-            is_class_method_override = True
-            original_teardown_class = device.test.__class__.teardown_class
-            original_setup_test = device.test.__class__.setup_test
-
-            def teardown_class(self: BaseTestClass) -> None:
-                output_path: str = device.test.current_test_info.output_path  # type: ignore
-                trace = Trace(packet=packets)
-                with open(f"{output_path}/avatar.trace", "wb") as f:
-                    f.write(trace.SerializeToString())
-                original_teardown_class(self)
-
-
-            def setup_test(self: BaseTestClass) -> None:
-                assert hasattr(self, "devices")
-                devices: PandoraDevices = getattr(self, "devices", [])
-                packets.append(
-                    TracePacket(
-                        track_descriptor=TrackDescriptor(
-                            uuid=process_id(self),
-                            process=ProcessDescriptor(pid=1, process_name=process_name(self)),
-                        )
-                    )
-                )
-
-                for device in devices:
-                    descriptor = TrackDescriptor(
-                        uuid=device_id(device),
-                        parent_uuid=process_id(self),
-                        thread=ThreadDescriptor(thread_name=device.name, pid=1, tid=id(device) & 0xFFFF),
-                    )
-                    packets.append(TracePacket(track_descriptor=descriptor))
-
-                original_setup_test(self)
-
-            device.test.__class__.teardown_class = types.MethodType(teardown_class, device.test)
-            device.test.__class__.setup_test =  types.MethodType(setup_test, device.test)
 
         device.log.info(f"{self}")
 
