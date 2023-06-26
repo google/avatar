@@ -40,6 +40,7 @@ else:
 
 
 packets: List[TracePacket] = []
+genesis: int = time.monotonic_ns()
 
 def process_name(test: BaseTestClass) -> str:
     return f"{test.__class__.__name__}.{test.current_test_info.name}"
@@ -69,13 +70,15 @@ def hook_test(test: BaseTestClass) -> None:
 
 
     def setup_test(self: BaseTestClass) -> None:
+        global genesis
+        genesis = time.monotonic_ns()
         assert hasattr(self, "devices")
         devices: PandoraDevices = getattr(self, "devices", [])
         packets.append(
             TracePacket(
                 track_descriptor=TrackDescriptor(
                     uuid=process_id(self),
-                    process=ProcessDescriptor(pid=1, process_name=process_name(self)),
+                    process=ProcessDescriptor(pid=process_id(self), process_name=process_name(self)),
                 )
             )
         )
@@ -84,7 +87,7 @@ def hook_test(test: BaseTestClass) -> None:
             descriptor = TrackDescriptor(
                 uuid=device_id(device),
                 parent_uuid=process_id(self),
-                thread=ThreadDescriptor(thread_name=device.name, pid=1, tid=id(device) & 0xFFFF),
+                thread=ThreadDescriptor(thread_name=device.name, pid=process_id(self), tid=device_id(device)),
             )
             packets.append(TracePacket(track_descriptor=descriptor))
 
@@ -107,7 +110,7 @@ class Callsite(AsTrace):
         return cls.id_counter
 
     def __init__(self, device: PandoraClient, name: Union[bytes, str], message: Any) -> None:
-        self.at = time.perf_counter_ns()
+        self.at = time.monotonic_ns() - genesis
         self.name = name if isinstance(name, str) else name.decode('utf-8')
         self.device = device
         self.message = message
@@ -147,13 +150,13 @@ class Callsite(AsTrace):
                 if self.message is None
                 else [DebugAnnotation(string_value=message_prettifier(f"{self.message}"))],
             ),
-            trusted_packet_sequence_id=1,
+            trusted_packet_sequence_id=process_id(self.device.test),
         )
 
 
 class CallEvent(AsTrace):
     def __init__(self, callsite: Callsite, message: Any) -> None:
-        self.at = time.perf_counter_ns()
+        self.at = time.monotonic_ns() - genesis
         self.callsite = callsite
         self.message = message
 
@@ -173,7 +176,7 @@ class CallEvent(AsTrace):
                 if self.message is None
                 else [DebugAnnotation(string_value=message_prettifier(f"{self.message}"))],
             ),
-            trusted_packet_sequence_id=1,
+            trusted_packet_sequence_id=process_id(self.callsite.device.test),
         )
 
     def stringify(self, direction: str) -> str:
@@ -212,7 +215,7 @@ class CallEnd(CallEvent):
                 if self.message is None
                 else [DebugAnnotation(string_value=message_prettifier(f"{self.message}"))],
             ),
-            trusted_packet_sequence_id=1,
+            trusted_packet_sequence_id=process_id(self.callsite.device.test),
         )
 
 
