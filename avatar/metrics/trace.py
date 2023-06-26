@@ -29,11 +29,11 @@ from avatar.metrics.trace_pb2 import (
 )
 from google.protobuf.text_encoding import CUnescape
 from mobly.base_test import BaseTestClass
-from typing import TYPE_CHECKING, Any, Dict, List, Protocol, Union
+from typing import TYPE_CHECKING, Any, List, Protocol, Union
 
 if TYPE_CHECKING:
-    from avatar.pandora_client import PandoraClient
     from avatar import PandoraDevices
+    from avatar.pandora_client import PandoraClient
 else:
     PandoraClient = object
     PandoraDevices = object
@@ -44,18 +44,22 @@ genesis: int = time.monotonic_ns()
 process_id: int = 0
 device_id: int = 0
 
+
 def process_name(test: BaseTestClass) -> str:
     return f"{test.__class__.__name__}.{test.current_test_info.name}"
+
 
 def next_process_id() -> int:
     global process_id
     process_id += 1
     return process_id
 
+
 def next_device_id() -> int:
     global device_id
     device_id += 1
     return device_id
+
 
 def hook_test(test: BaseTestClass) -> None:
     global packets
@@ -74,12 +78,11 @@ def hook_test(test: BaseTestClass) -> None:
 
         original_teardown_class(self)
 
-
     def setup_test(self: BaseTestClass) -> None:
         global genesis, process_id
         genesis = time.monotonic_ns()
         assert hasattr(self, "devices")
-        devices: PandoraDevices = getattr(self, "devices", [])
+        devices: PandoraDevices = getattr(self, "devices", [])  # type: ignore
         packets.append(
             TracePacket(
                 track_descriptor=TrackDescriptor(
@@ -101,7 +104,8 @@ def hook_test(test: BaseTestClass) -> None:
         original_setup_test(self)
 
     test.__class__.teardown_class = types.MethodType(teardown_class, test)
-    test.__class__.setup_test =  types.MethodType(setup_test, test)
+    test.__class__.setup_test = types.MethodType(setup_test, test)
+
 
 class AsTrace(Protocol):
     def as_trace(self) -> TracePacket:

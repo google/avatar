@@ -61,6 +61,7 @@ class PandoraClient:
     test: BaseTestClass
     grpc_target: str  # Server address for the gRPC channel.
     log: 'PandoraClientLoggerAdapter'  # Logger adapter.
+    uuid: int
 
     # private fields
     _channel: grpc.Channel  # Synchronous gRPC channel.
@@ -185,7 +186,6 @@ class PandoraClient:
     @property
     def id(self) -> int:
         return (id(self) & 0xFFFF) | (self.process_id << 0x4)
-
 
 
 class PandoraClientLoggerAdapter(logging.LoggerAdapter):  # type: ignore
