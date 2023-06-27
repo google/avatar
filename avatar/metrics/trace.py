@@ -159,7 +159,7 @@ class Callsite(AsTrace):
                 track_uuid=self.device.uuid,
                 debug_annotations=None
                 if self.message is None
-                else [DebugAnnotation(string_value=message_prettifier(f"{self.message}"))],
+                else [DebugAnnotation(name=self.message.__name__, string_value=message_prettifier(f"{self.message}"))],
             ),
             trusted_packet_sequence_id=process_id,
         )
@@ -185,7 +185,7 @@ class CallEvent(AsTrace):
                 track_uuid=self.callsite.device.uuid,
                 debug_annotations=None
                 if self.message is None
-                else [DebugAnnotation(string_value=message_prettifier(f"{self.message}"))],
+                else [DebugAnnotation(name=self.message.__name__, string_value=message_prettifier(f"{self.message}"))],
             ),
             trusted_packet_sequence_id=process_id,
         )
@@ -225,7 +225,7 @@ class CallEnd(CallEvent):
                 track_uuid=self.callsite.device.uuid,
                 debug_annotations=None
                 if self.message is None
-                else [DebugAnnotation(string_value=message_prettifier(f"{self.message}"))],
+                else [DebugAnnotation(name=self.message.__name__, string_value=message_prettifier(f"{self.message}"))],
             ),
             trusted_packet_sequence_id=process_id,
         )

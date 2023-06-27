@@ -69,5 +69,10 @@ message ThreadDescriptor {
 }
 
 message DebugAnnotation {
-  required string string_value = 6;
+  oneof name_field {
+    string name = 10;
+  }
+  oneof value {
+    string string_value = 6;
+  }
 }

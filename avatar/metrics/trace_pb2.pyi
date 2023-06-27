@@ -108,7 +108,22 @@ class ThreadDescriptor(_message.Message):
     ) -> None: ...
 
 class DebugAnnotation(_message.Message):
-    __slots__ = ["string_value"]
+    __slots__ = ["name_iid", "name", "string_value", "proto_type_name", "proto_type_name_iid"]
+    NAME_IID_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
     STRING_VALUE_FIELD_NUMBER: _ClassVar[int]
+    PROTO_TYPE_NAME_FIELD_NUMBER: _ClassVar[int]
+    PROTO_TYPE_NAME_IID_FIELD_NUMBER: _ClassVar[int]
+    name_iid: int
+    name: str
     string_value: str
-    def __init__(self, string_value: _Optional[str] = ...) -> None: ...
+    proto_type_name: str
+    proto_type_name_iid: int
+    def __init__(
+        self,
+        name_iid: _Optional[int] = ...,
+        name: _Optional[str] = ...,
+        string_value: _Optional[str] = ...,
+        proto_type_name: _Optional[str] = ...,
+        proto_type_name_iid: _Optional[int] = ...,
+    ) -> None: ...
