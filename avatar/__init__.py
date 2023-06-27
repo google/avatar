@@ -80,7 +80,7 @@ class PandoraDevices(Sized, Iterable[PandoraDevice]):
         self._clients = []
         self._servers = []
 
-        trace.hook_test(test)
+        trace.hook_test(test, self)
         user_params: Dict[str, Any] = test.user_params  # type: ignore
         controller_configs: Dict[str, Any] = test.controller_configs.copy()  # type: ignore
         sorted_controllers = sorted(

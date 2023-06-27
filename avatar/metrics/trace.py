@@ -38,23 +38,18 @@ else:
     PandoraClient = object
     PandoraDevices = object
 
-
 packets: List[TracePacket] = []
 genesis: int = time.monotonic_ns()
-uuid: int = 0
+id: int = 0
 
 
-def process_name(test: BaseTestClass) -> str:
-    return f"{test.__class__.__name__}.{test.current_test_info.name}"
+def next_id() -> int:
+    global id
+    id += 1
+    return id
 
 
-def next_uuid() -> int:
-    global uuid
-    uuid += 1
-    return uuid
-
-
-def hook_test(test: BaseTestClass) -> None:
+def hook_test(test: BaseTestClass, devices: PandoraDevices) -> None:
     global packets
     original_teardown_class = test.__class__.teardown_class
     original_setup_test = test.__class__.setup_test
@@ -74,21 +69,21 @@ def hook_test(test: BaseTestClass) -> None:
     def setup_test(self: BaseTestClass) -> None:
         global genesis
         genesis = time.monotonic_ns()
-        assert hasattr(self, "devices")
-        process_id = next_uuid()
-        devices: PandoraDevices = getattr(self, "devices", [])  # type: ignore
+        process_id = next_id()
         packets.append(
             TracePacket(
                 track_descriptor=TrackDescriptor(
                     uuid=process_id,
-                    process=ProcessDescriptor(pid=process_id, process_name=process_name(self)),
+                    process=ProcessDescriptor(
+                        pid=process_id, process_name=f"{test.__class__.__name__}.{test.current_test_info.name}"
+                    ),
                 )
             )
         )
 
         for device in devices:
             device.process_id = process_id
-            device.uuid = next_uuid()
+            device.uuid = next_id()
             descriptor = TrackDescriptor(
                 uuid=device.uuid,
                 parent_uuid=device.process_id,
@@ -122,8 +117,6 @@ class Callsite(AsTrace):
         self.message = message
         self.events: List[CallEvent] = []
         self.id = Callsite.next_id()
-
-        device.log.info(f"{self}")
 
     def __str__(self) -> str:
         name_pretty = self.name[1:].replace('/', '.')
