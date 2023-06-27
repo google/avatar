@@ -191,7 +191,8 @@ class CallEvent(AsTrace):
         )
 
     def stringify(self, direction: str) -> str:
-        message_pretty = message_prettifier(f"{self.message}")
+        message = "" if self.message is None else self.message
+        message_pretty = message_prettifier(f"{message}")
         return f"[{(self.at - self.callsite.at) / 1000000000:.3f}s] {self.callsite} {direction} ({message_pretty})"
 
 

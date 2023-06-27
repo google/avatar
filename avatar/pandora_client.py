@@ -178,15 +178,6 @@ class PandoraClient:
             )
         return self._aio
 
-    @property
-    def process_id(self) -> int:
-        current_process = f"{self.test.__class__.__name__}.{self.test.current_test_info.name}"
-        return hash(current_process) & 0xFFFF
-
-    @property
-    def id(self) -> int:
-        return (id(self) & 0xFFFF) | (self.process_id << 0x4)
-
 
 class PandoraClientLoggerAdapter(logging.LoggerAdapter):  # type: ignore
     """Formats logs from the PandoraClient."""
