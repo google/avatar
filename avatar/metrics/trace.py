@@ -118,6 +118,8 @@ class Callsite(AsTrace):
         self.events: List[CallEvent] = []
         self.id = Callsite.next_id()
 
+        device.log.info(f"{self}")
+
     def __str__(self) -> str:
         name_pretty = self.name[1:].replace('/', '.')
         if self.message is None:
