@@ -61,6 +61,7 @@ class PandoraClient:
     test: BaseTestClass
     grpc_target: str  # Server address for the gRPC channel.
     log: 'PandoraClientLoggerAdapter'  # Logger adapter.
+    process_id: int
     uuid: int
 
     # private fields

@@ -41,24 +41,17 @@ else:
 
 packets: List[TracePacket] = []
 genesis: int = time.monotonic_ns()
-process_id: int = 0
-device_id: int = 0
+uuid: int = 0
 
 
 def process_name(test: BaseTestClass) -> str:
     return f"{test.__class__.__name__}.{test.current_test_info.name}"
 
 
-def next_process_id() -> int:
-    global process_id
-    process_id += 1
-    return process_id
-
-
-def next_device_id() -> int:
-    global device_id
-    device_id += 1
-    return device_id
+def next_uuid() -> int:
+    global uuid
+    uuid += 1
+    return uuid
 
 
 def hook_test(test: BaseTestClass) -> None:
@@ -79,25 +72,27 @@ def hook_test(test: BaseTestClass) -> None:
         original_teardown_class(self)
 
     def setup_test(self: BaseTestClass) -> None:
-        global genesis, process_id
+        global genesis
         genesis = time.monotonic_ns()
         assert hasattr(self, "devices")
+        process_id = next_uuid()
         devices: PandoraDevices = getattr(self, "devices", [])  # type: ignore
         packets.append(
             TracePacket(
                 track_descriptor=TrackDescriptor(
-                    uuid=next_process_id(),
+                    uuid=process_id,
                     process=ProcessDescriptor(pid=process_id, process_name=process_name(self)),
                 )
             )
         )
 
         for device in devices:
-            device.uuid = next_device_id()
+            device.process_id = process_id
+            device.uuid = next_uuid()
             descriptor = TrackDescriptor(
                 uuid=device.uuid,
-                parent_uuid=process_id,
-                thread=ThreadDescriptor(thread_name=device.name, pid=process_id, tid=device.uuid),
+                parent_uuid=device.process_id,
+                thread=ThreadDescriptor(thread_name=device.name, pid=device.process_id, tid=device.uuid),
             )
             packets.append(TracePacket(track_descriptor=descriptor))
 
@@ -161,7 +156,7 @@ class Callsite(AsTrace):
                 if self.message is None
                 else [DebugAnnotation(name=self.message.__name__, string_value=message_prettifier(f"{self.message}"))],
             ),
-            trusted_packet_sequence_id=process_id,
+            trusted_packet_sequence_id=self.device.process_id,
         )
 
 
@@ -187,7 +182,7 @@ class CallEvent(AsTrace):
                 if self.message is None
                 else [DebugAnnotation(name=self.message.__name__, string_value=message_prettifier(f"{self.message}"))],
             ),
-            trusted_packet_sequence_id=process_id,
+            trusted_packet_sequence_id=self.callsite.device.process_id,
         )
 
     def stringify(self, direction: str) -> str:
@@ -227,7 +222,7 @@ class CallEnd(CallEvent):
                 if self.message is None
                 else [DebugAnnotation(name=self.message.__name__, string_value=message_prettifier(f"{self.message}"))],
             ),
-            trusted_packet_sequence_id=process_id,
+            trusted_packet_sequence_id=self.callsite.device.process_id,
         )
 
 
