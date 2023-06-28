@@ -29,7 +29,7 @@ from avatar.metrics.trace_pb2 import (
 )
 from google.protobuf.text_encoding import CUnescape
 from mobly.base_test import BaseTestClass
-from typing import TYPE_CHECKING, Any, List, Protocol, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Protocol, Union
 
 if TYPE_CHECKING:
     from avatar import PandoraDevices
@@ -38,6 +38,8 @@ else:
     PandoraClient = object
     PandoraDevices = object
 
+devices_id: Dict[PandoraClient, int] = {}
+devices_process_id: Dict[PandoraClient, int] = {}
 packets: List[TracePacket] = []
 genesis: int = time.monotonic_ns()
 id: int = 0
@@ -82,12 +84,12 @@ def hook_test(test: BaseTestClass, devices: PandoraDevices) -> None:
         )
 
         for device in devices:
-            device.process_id = process_id
-            device.uuid = next_id()
+            devices_process_id[device] = process_id
+            devices_id[device] = next_id()
             descriptor = TrackDescriptor(
-                uuid=device.uuid,
-                parent_uuid=device.process_id,
-                thread=ThreadDescriptor(thread_name=device.name, pid=device.process_id, tid=device.uuid),
+                uuid=devices_id[device],
+                parent_uuid=process_id,
+                thread=ThreadDescriptor(thread_name=device.name, pid=process_id, tid=devices_id[device]),
             )
             packets.append(TracePacket(track_descriptor=descriptor))
 
@@ -146,12 +148,12 @@ class Callsite(AsTrace):
             track_event=TrackEvent(
                 name=self.name,
                 type=TrackEvent.Type.TYPE_SLICE_BEGIN,
-                track_uuid=self.device.uuid,
+                track_uuid=devices_id[self.device],
                 debug_annotations=None
                 if self.message is None
                 else [DebugAnnotation(name=self.message.__name__, string_value=message_prettifier(f"{self.message}"))],
             ),
-            trusted_packet_sequence_id=self.device.process_id,
+            trusted_packet_sequence_id=devices_process_id[self.device],
         )
 
 
@@ -172,12 +174,12 @@ class CallEvent(AsTrace):
             track_event=TrackEvent(
                 name=self.callsite.name,
                 type=TrackEvent.Type.TYPE_INSTANT,
-                track_uuid=self.callsite.device.uuid,
+                track_uuid=devices_id[self.callsite.device],
                 debug_annotations=None
                 if self.message is None
                 else [DebugAnnotation(name=self.message.__name__, string_value=message_prettifier(f"{self.message}"))],
             ),
-            trusted_packet_sequence_id=self.callsite.device.process_id,
+            trusted_packet_sequence_id=devices_process_id[self.callsite.device],
         )
 
     def stringify(self, direction: str) -> str:
@@ -212,12 +214,12 @@ class CallEnd(CallEvent):
             track_event=TrackEvent(
                 name=self.callsite.name,
                 type=TrackEvent.Type.TYPE_SLICE_END,
-                track_uuid=self.callsite.device.uuid,
+                track_uuid=devices_id[self.callsite.device],
                 debug_annotations=None
                 if self.message is None
                 else [DebugAnnotation(name=self.message.__name__, string_value=message_prettifier(f"{self.message}"))],
             ),
-            trusted_packet_sequence_id=self.callsite.device.process_id,
+            trusted_packet_sequence_id=devices_process_id[self.callsite.device],
         )
 
 

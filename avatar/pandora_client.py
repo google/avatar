@@ -28,7 +28,6 @@ from bumble import pandora as bumble_server
 from bumble.hci import Address as BumbleAddress
 from bumble.pandora.device import PandoraDevice as BumblePandoraDevice
 from dataclasses import dataclass
-from mobly.base_test import BaseTestClass
 from pandora import host_grpc, host_grpc_aio, security_grpc, security_grpc_aio
 from typing import Any, Dict, MutableMapping, Optional, Tuple, Union
 
@@ -58,11 +57,8 @@ class PandoraClient:
 
     # public fields
     name: str
-    test: BaseTestClass
     grpc_target: str  # Server address for the gRPC channel.
     log: 'PandoraClientLoggerAdapter'  # Logger adapter.
-    process_id: int
-    uuid: int
 
     # private fields
     _channel: grpc.Channel  # Synchronous gRPC channel.
