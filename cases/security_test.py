@@ -141,12 +141,6 @@ class SecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
                 + 'report the encryption state the with the bonding state'
             )
 
-        if self.ref.name == 'android':
-            raise signals.TestSkip(
-                'TODO: (add bug number) Fix core stack:\n'
-                + 'BOND_BONDED event is triggered before the encryption changed'
-            )
-
         if isinstance(self.ref, BumblePandoraDevice) and ref_io_capability == 'against_default_io_cap':
             raise signals.TestSkip('Skip default IO cap for Bumble REF.')
 

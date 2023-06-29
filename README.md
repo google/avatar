@@ -1,4 +1,4 @@
-# Avatar
+# Avatar - DO NOT COMMIT - COPYBARA TEST
 
 Avatar aims to provide a scalable multi-platform Bluetooth testing tool capable
 of running any Bluetooth test cases virtually and physically. It aims to
