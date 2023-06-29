@@ -14,4 +14,4 @@ protoc trace.proto --pyi_out=./ --python_out=./
 ```
 
 To ensure compliance with the linter, you must modify the generated
-`pyi` file by eliminating `Union[T, _Mapping]` from it.
+`.pyi` file by replacing `Union[T, _Mapping]` to `T`.

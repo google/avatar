@@ -108,22 +108,40 @@ class ThreadDescriptor(_message.Message):
     ) -> None: ...
 
 class DebugAnnotation(_message.Message):
-    __slots__ = ["name_iid", "name", "string_value", "proto_type_name", "proto_type_name_iid"]
-    NAME_IID_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = [
+        "name",
+        "bool_value",
+        "uint_value",
+        "int_value",
+        "double_value",
+        "string_value",
+        "dict_entries",
+        "array_values",
+    ]
     NAME_FIELD_NUMBER: _ClassVar[int]
+    BOOL_VALUE_FIELD_NUMBER: _ClassVar[int]
+    UINT_VALUE_FIELD_NUMBER: _ClassVar[int]
+    INT_VALUE_FIELD_NUMBER: _ClassVar[int]
+    DOUBLE_VALUE_FIELD_NUMBER: _ClassVar[int]
     STRING_VALUE_FIELD_NUMBER: _ClassVar[int]
-    PROTO_TYPE_NAME_FIELD_NUMBER: _ClassVar[int]
-    PROTO_TYPE_NAME_IID_FIELD_NUMBER: _ClassVar[int]
-    name_iid: int
+    DICT_ENTRIES_FIELD_NUMBER: _ClassVar[int]
+    ARRAY_VALUES_FIELD_NUMBER: _ClassVar[int]
     name: str
+    bool_value: bool
+    uint_value: int
+    int_value: int
+    double_value: float
     string_value: str
-    proto_type_name: str
-    proto_type_name_iid: int
+    dict_entries: _containers.RepeatedCompositeFieldContainer[DebugAnnotation]
+    array_values: _containers.RepeatedCompositeFieldContainer[DebugAnnotation]
     def __init__(
         self,
-        name_iid: _Optional[int] = ...,
         name: _Optional[str] = ...,
+        bool_value: bool = ...,
+        uint_value: _Optional[int] = ...,
+        int_value: _Optional[int] = ...,
+        double_value: _Optional[float] = ...,
         string_value: _Optional[str] = ...,
-        proto_type_name: _Optional[str] = ...,
-        proto_type_name_iid: _Optional[int] = ...,
+        dict_entries: _Optional[_Iterable[DebugAnnotation]] = ...,
+        array_values: _Optional[_Iterable[DebugAnnotation]] = ...,
     ) -> None: ...

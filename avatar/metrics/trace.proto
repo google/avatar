@@ -64,7 +64,6 @@ message ProcessDescriptor {
 message ThreadDescriptor {
   optional int32 pid = 1;
   optional int32 tid = 2;
-
   optional string thread_name = 5;
 }
 
@@ -73,6 +72,12 @@ message DebugAnnotation {
     string name = 10;
   }
   oneof value {
+    bool bool_value = 2;
+    uint64 uint_value = 3;
+    int64 int_value = 4;
+    double double_value = 5;
     string string_value = 6;
   }
+  repeated DebugAnnotation dict_entries = 11;
+  repeated DebugAnnotation array_values = 12;
 }

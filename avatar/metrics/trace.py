@@ -14,7 +14,6 @@
 
 """Avatar metrics trace."""
 
-import re
 import time
 import types
 
@@ -27,9 +26,9 @@ from avatar.metrics.trace_pb2 import (
     TrackDescriptor,
     TrackEvent,
 )
-from google.protobuf.text_encoding import CUnescape
+from google.protobuf import any_pb2, message
 from mobly.base_test import BaseTestClass
-from typing import TYPE_CHECKING, Any, Dict, List, Protocol, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Protocol, Tuple, Union
 
 if TYPE_CHECKING:
     from avatar import PandoraDevices
@@ -126,7 +125,7 @@ class Callsite(AsTrace):
         name_pretty = self.name[1:].replace('/', '.')
         if self.message is None:
             return f"%{self.id} {name_pretty}"
-        message_pretty = message_prettifier(f"{self.message}")
+        message_pretty, _ = debug_message(self.message)
         return f"%{self.id} {name_pretty}({message_pretty})"
 
     def output(self, message: Any) -> None:
@@ -154,9 +153,7 @@ class Callsite(AsTrace):
                 debug_annotations=None
                 if self.message is None
                 else [
-                    DebugAnnotation(
-                        name=self.message.__class__.__name__, string_value=message_prettifier(f"{self.message}")
-                    )
+                    DebugAnnotation(name=self.message.__class__.__name__, dict_entries=debug_message(self.message)[1])
                 ],
             ),
             trusted_packet_sequence_id=devices_process_id[self.device],
@@ -184,17 +181,14 @@ class CallEvent(AsTrace):
                 debug_annotations=None
                 if self.message is None
                 else [
-                    DebugAnnotation(
-                        name=self.message.__class__.__name__, string_value=message_prettifier(f"{self.message}")
-                    )
+                    DebugAnnotation(name=self.message.__class__.__name__, dict_entries=debug_message(self.message)[1])
                 ],
             ),
             trusted_packet_sequence_id=devices_process_id[self.callsite.device],
         )
 
     def stringify(self, direction: str) -> str:
-        message = "" if self.message is None else self.message
-        message_pretty = message_prettifier(f"{message}")
+        message_pretty = "" if self.message is None else debug_message(self.message)[0]
         return f"[{(self.at - self.callsite.at) / 1000000000:.3f}s] {self.callsite} {direction} ({message_pretty})"
 
 
@@ -228,25 +222,49 @@ class CallEnd(CallEvent):
                 debug_annotations=None
                 if self.message is None
                 else [
-                    DebugAnnotation(
-                        name=self.message.__class__.__name__, string_value=message_prettifier(f"{self.message}")
-                    )
+                    DebugAnnotation(name=self.message.__class__.__name__, dict_entries=debug_message(self.message)[1])
                 ],
             ),
             trusted_packet_sequence_id=devices_process_id[self.callsite.device],
         )
 
 
-def message_prettifier(msg: str) -> str:
-    msg = msg.replace("{\n", "{").replace("\n", ",").replace(" ", "").replace(",}", "}")
-    msg = re.sub(r"{cookie{value:(\"[^\"]+\")}}", lambda m: f":{m.groups()[0]}", msg)
+def debug_value(v: Any) -> Tuple[Any, Dict[str, Any]]:
+    if isinstance(v, any_pb2.Any):
+        return '...', {'string_value': f'{v}'}
+    elif isinstance(v, message.Message):
+        json, entries = debug_message(v)
+        return json, {'dict_entries': entries}
+    elif isinstance(v, bytes):
+        return (v if len(v) < 16 else '...'), {'string_value': f'{v!r}'}
+    elif isinstance(v, bool):
+        return v, {'bool_value': v}
+    elif isinstance(v, int):
+        return v, {'int_value': v}
+    elif isinstance(v, float):
+        return v, {'double_value': v}
+    elif isinstance(v, str):
+        return v, {'string_value': v}
+    try:
+        return v, {'array_values': [DebugAnnotation(**debug_value(x)[1]) for x in v]}  # type: ignore
+    except:
+        return v, {'string_value': f'{v}'}
 
-    def repl(addr: re.Match[str]) -> str:
-        m = CUnescape(addr.groups()[0])
-        if len(m) > 8:
-            return ":'...'"
-        if len(m) == 4 and m[0] == 0 and m[1] == 0:
-            m = m[2:]
-        return ":'" + ':'.join([f'{x:02X}' for x in m]) + "'"
 
-    return re.sub(r":\"([^\"]+)\"", repl, msg)[:-1]
+def debug_message(msg: message.Message) -> Tuple[Dict[str, Any], List[DebugAnnotation]]:
+    json: Dict[str, Any] = {}
+    dbga: List[DebugAnnotation] = []
+    for (f, v) in msg.ListFields():
+        if (
+            isinstance(v, bytes)
+            and len(v) == 6
+            and ('address' in f.name or (f.containing_oneof and 'address' in f.containing_oneof.name))
+        ):
+            addr = ':'.join([f'{x:02X}' for x in v])
+            json[f.name] = addr
+            dbga.append(DebugAnnotation(name=f.name, string_value=addr))
+        else:
+            json_entry, dbga_entry = debug_value(v)
+            json[f.name] = json_entry
+            dbga.append(DebugAnnotation(name=f.name, **dbga_entry))
+    return json, dbga
