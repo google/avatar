@@ -137,6 +137,8 @@ class Callsite(AsTrace):
 
     def end(self, message: Any) -> None:
         global packets
+        if self.device not in devices_id:
+            return
         self.events.append(CallEnd(self, message))
         packets.append(self.as_trace())
         for event in self.events:
@@ -151,7 +153,11 @@ class Callsite(AsTrace):
                 track_uuid=devices_id[self.device],
                 debug_annotations=None
                 if self.message is None
-                else [DebugAnnotation(name=self.message.__name__, string_value=message_prettifier(f"{self.message}"))],
+                else [
+                    DebugAnnotation(
+                        name=self.message.__class__.__name__, string_value=message_prettifier(f"{self.message}")
+                    )
+                ],
             ),
             trusted_packet_sequence_id=devices_process_id[self.device],
         )
@@ -177,7 +183,11 @@ class CallEvent(AsTrace):
                 track_uuid=devices_id[self.callsite.device],
                 debug_annotations=None
                 if self.message is None
-                else [DebugAnnotation(name=self.message.__name__, string_value=message_prettifier(f"{self.message}"))],
+                else [
+                    DebugAnnotation(
+                        name=self.message.__class__.__name__, string_value=message_prettifier(f"{self.message}")
+                    )
+                ],
             ),
             trusted_packet_sequence_id=devices_process_id[self.callsite.device],
         )
@@ -217,7 +227,11 @@ class CallEnd(CallEvent):
                 track_uuid=devices_id[self.callsite.device],
                 debug_annotations=None
                 if self.message is None
-                else [DebugAnnotation(name=self.message.__name__, string_value=message_prettifier(f"{self.message}"))],
+                else [
+                    DebugAnnotation(
+                        name=self.message.__class__.__name__, string_value=message_prettifier(f"{self.message}")
+                    )
+                ],
             ),
             trusted_packet_sequence_id=devices_process_id[self.callsite.device],
         )
