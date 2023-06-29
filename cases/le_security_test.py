@@ -119,6 +119,11 @@ class LeSecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
                 + '- When disconnected the `Secure/WaitSecurity` never returns.'
             )
 
+        if self.ref.name == 'android' and ref_address_type == 'against_public':
+            raise signals.TestSkip(
+                'Android does not support PUBLIC address type.'
+            )
+
         if 'reject' in variant or 'rejected' in variant:
             raise signals.TestSkip(
                 'TODO: Currently these scnearios are not working. Working on them.'
