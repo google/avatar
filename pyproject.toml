@@ -11,6 +11,7 @@ classifiers = [
 dependencies = [
     "bt-test-interfaces",
     "bumble==0.0.154",
+    "protobuf>=4.22.0",
     "grpcio>=1.51.1",
     "mobly>=1.12",
     "portpicker>=1.5.2",
@@ -56,6 +57,10 @@ module = "grpc.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
+module = "google.protobuf.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
 module = "mobly.*"
 ignore_missing_imports = true
 
@@ -65,7 +70,7 @@ ignore_missing_imports = true
 
 [tool.pyright]
 include = ["avatar", "cases"]
-exclude = ["**/__pycache__"]
+exclude = ["**/__pycache__", "**/*_pb2.py"]
 typeCheckingMode = "strict"
 useLibraryCodeForTypes = true
 verboseOutput = false

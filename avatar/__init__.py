@@ -28,6 +28,7 @@ import logging
 
 from avatar import pandora_server
 from avatar.aio import asynchronous
+from avatar.metrics import trace
 from avatar.pandora_client import BumblePandoraClient as BumblePandoraDevice, PandoraClient as PandoraDevice
 from avatar.pandora_server import PandoraServer
 from mobly import base_test
@@ -79,6 +80,7 @@ class PandoraDevices(Sized, Iterable[PandoraDevice]):
         self._clients = []
         self._servers = []
 
+        trace.hook_test(test, self)
         user_params: Dict[str, Any] = test.user_params  # type: ignore
         controller_configs: Dict[str, Any] = test.controller_configs.copy()  # type: ignore
         sorted_controllers = sorted(
