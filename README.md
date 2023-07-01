@@ -25,9 +25,9 @@ python cases/host_test.py -c cases/config.yml --test_bed bumble.bumbles --verbos
 
 ## Development
 
-1. Make sure to have a `rootcanal` instance running somewhere.
+1. Make sure to have a `root-canal` instance running somewhere.
 ```bash
-./tools/rootcanal
+root-canal
 ```
 
 1. Run the example using Bumble vs Bumble config file. The default `6402` HCI port of `root-canal` may be changed in this config file.
