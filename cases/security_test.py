@@ -124,17 +124,6 @@ class SecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
                 + '- When disconnected the `Secure/WaitSecurity` never returns.'
             )
 
-        if (
-            self.dut.name == 'android'
-            and ref_io_capability == 'against_keyboard_only'
-            and variant == 'rejected'
-            and (connect == 'incoming_connection' or pair == 'outgoing_pairing')
-        ):
-            raise signals.TestSkip(
-                'TODO: Fix AOSP stack for this variant:\n'
-                + 'Android does not seems to react correctly against pairing reject from KEYBOARD_ONLY devices.'
-            )
-
         if self.dut.name == 'android' and pair == 'outgoing_pairing' and ref_role == 'against_central':
             raise signals.TestSkip(
                 'TODO: Fix PandoraSecurity server for android:\n'
