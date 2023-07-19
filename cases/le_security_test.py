@@ -37,7 +37,8 @@ class LeSecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
     dut: PandoraDevice
     ref: PandoraDevice
 
-    def setup_class(self) -> None:
+    @avatar.asynchronous
+    async def setup_class(self) -> None:
         self.devices = PandoraDevices(self)
         self.dut, self.ref, *_ = self.devices
 
@@ -46,13 +47,16 @@ class LeSecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
             if isinstance(device, BumblePandoraDevice):
                 device.config.setdefault('classic_enabled', True)
 
+        await asyncio.gather(self.dut.reset(), self.ref.reset())
+
     def teardown_class(self) -> None:
         if self.devices:
             self.devices.stop_all()
 
     @avatar.asynchronous
-    async def setup_test(self) -> None:  # pytype: disable=wrong-arg-types
-        await asyncio.gather(self.dut.reset(), self.ref.reset())
+    async def teardown_test(self) -> None:
+        if self.results.is_test_executed(self.current_test_info.name):  # type: ignore
+            await asyncio.gather(self.dut.reset(), self.ref.reset())
 
     async def handle_pairing_events(self) -> NoReturn:
         ref_pairing_stream = self.ref.aio.security.OnPairing()

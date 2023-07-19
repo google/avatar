@@ -65,6 +65,11 @@ class SecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
         if self.devices:
             self.devices.stop_all()
 
+    @avatar.asynchronous
+    async def teardown_test(self) -> None:
+        if self.results.is_test_executed(self.current_test_info.name):  # type: ignore
+            await asyncio.gather(self.dut.reset(), self.ref.reset())
+
     @avatar.parameterized(
         *itertools.product(
             ('outgoing_connection', 'incoming_connection'),
@@ -141,9 +146,6 @@ class SecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
 
         if not isinstance(self.ref, BumblePandoraDevice) and ref_io_capability != 'against_default_io_cap':
             raise signals.TestSkip('Unable to override IO capability on non Bumble device.')
-
-        # Factory reset both DUT and REF devices.
-        await asyncio.gather(self.dut.reset(), self.ref.reset())
 
         # Override REF IO capability if supported.
         if isinstance(self.ref, BumblePandoraDevice):
