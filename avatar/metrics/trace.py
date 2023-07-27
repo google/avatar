@@ -52,8 +52,8 @@ def next_id() -> int:
 
 def hook_test(test: BaseTestClass, devices: PandoraDevices) -> None:
     global packets
-    original_teardown_class = test.__class__.teardown_class
-    original_setup_test = test.__class__.setup_test
+    original_teardown_class = test.teardown_class
+    original_setup_test = test.setup_test
 
     def teardown_class(self: BaseTestClass) -> None:
         output_path: str = test.current_test_info.output_path  # type: ignore
@@ -65,7 +65,7 @@ def hook_test(test: BaseTestClass, devices: PandoraDevices) -> None:
                 f.write(f"{packet}")
                 f.write("----------\n")
 
-        original_teardown_class(self)
+        original_teardown_class()
 
     def setup_test(self: BaseTestClass) -> None:
         global genesis
@@ -92,10 +92,10 @@ def hook_test(test: BaseTestClass, devices: PandoraDevices) -> None:
             )
             packets.append(TracePacket(track_descriptor=descriptor))
 
-        original_setup_test(self)
+        original_setup_test()
 
-    test.__class__.teardown_class = types.MethodType(teardown_class, test)
-    test.__class__.setup_test = types.MethodType(setup_test, test)
+    test.teardown_class = types.MethodType(teardown_class, test)
+    test.setup_test = types.MethodType(setup_test, test)
 
 
 class AsTrace(Protocol):
