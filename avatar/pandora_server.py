@@ -19,7 +19,11 @@ import asyncio
 import avatar.aio
 import grpc
 import grpc.aio
+import logging
+import os
 import portpicker
+import re
+import shlex
 import threading
 import types
 
@@ -110,6 +114,8 @@ class AndroidPandoraServer(PandoraServer[AndroidDevice]):
 
     _instrumentation: Optional[threading.Thread] = None
     _port: int
+    _logger: logging.Logger
+    _handler: logging.Handler
 
     def start(self) -> PandoraClient:
         """Sets up and starts the Pandora server on the Android device."""
@@ -130,6 +136,31 @@ class AndroidPandoraServer(PandoraServer[AndroidDevice]):
         self._instrumentation.start()
         self.device.adb.forward([f'tcp:{self._port}', f'tcp:{ANDROID_SERVER_GRPC_PORT}'])  # type: ignore
 
+        # Forward all logging to ADB logs
+        adb = self.device.adb
+
+        class AdbLoggingHandler(logging.Handler):
+            def emit(self, record: logging.LogRecord) -> None:
+                if record.levelno <= logging.DEBUG:
+                    return
+                ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+                msg = self.format(record)
+                msg = ansi_escape.sub('', msg)
+                level = {
+                    logging.FATAL: 'f',
+                    logging.ERROR: 'e',
+                    logging.WARN: 'w',
+                    logging.INFO: 'i',
+                    logging.DEBUG: 'd',
+                    logging.NOTSET: 'd',
+                }[record.levelno]
+                for msg in msg.splitlines():
+                    os.system(f'adb -s {adb.serial} shell "log -t Avatar -p {level} {shlex.quote(msg)}"')
+
+        self._logger = logging.getLogger()
+        self._handler = AdbLoggingHandler()
+        self._logger.addHandler(self._handler)
+
         return PandoraClient(f'localhost:{self._port}', 'android')
 
     def stop(self) -> None:
@@ -140,6 +171,9 @@ class AndroidPandoraServer(PandoraServer[AndroidDevice]):
         self.device.adb._exec_adb_cmd(  # type: ignore
             'shell', f'am force-stop {ANDROID_SERVER_PACKAGE}', shell=False, timeout=None, stderr=None
         )
+
+        # Remove ADB logging handler
+        self._logger.removeHandler(self._handler)
 
         self.device.adb.forward(['--remove', f'tcp:{self._port}'])  # type: ignore
         self._instrumentation.join()
