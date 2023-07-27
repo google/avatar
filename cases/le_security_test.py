@@ -24,7 +24,7 @@ from mobly.asserts import assert_equal  # type: ignore
 from mobly.asserts import assert_in  # type: ignore
 from mobly.asserts import assert_is_not_none  # type: ignore
 from mobly.asserts import fail  # type: ignore
-from pandora.host_pb2 import PUBLIC, RANDOM, DataTypes, OwnAddressType, Connection
+from pandora.host_pb2 import PUBLIC, RANDOM, Connection, DataTypes, OwnAddressType
 from pandora.security_pb2 import LE_LEVEL3, PairingEventAnswer, SecureResponse, WaitSecurityResponse
 from typing import Any, Literal, Optional, Tuple, Union
 
@@ -76,13 +76,12 @@ class LeSecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
             ),
         )
     )  # type: ignore[misc]
-
     @avatar.asynchronous
     async def test_le_pairing(
         self,
         connect: Union[Literal['outgoing_connection'], Literal['incoming_connection']],
         pair: Union[Literal['outgoing_pairing'], Literal['incoming_pairing']],
-        ref_address_type: Union[Literal['against_random'], Literal['against_public']],
+        ref_address_type_name: Union[Literal['against_random'], Literal['against_public']],
         variant: Union[
             Literal['accept'],
             Literal['reject'],
@@ -102,15 +101,11 @@ class LeSecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
 
         if self.dut.name == 'android' and connect == 'outgoing_connection' and pair == 'incoming_pairing':
             # TODO: do not skip when doing physical tests.
-            raise signals.TestSkip(
-                'TODO: Yet to implement the test cases:\n'
-            )
+            raise signals.TestSkip('TODO: Yet to implement the test cases:\n')
 
         if self.dut.name == 'android' and connect == 'incoming_connection' and pair == 'outgoing_pairing':
             # TODO: do not skip when doing physical tests.
-            raise signals.TestSkip(
-                'TODO: Yet to implement the test cases:\n'
-            )
+            raise signals.TestSkip('TODO: Yet to implement the test cases:\n')
 
         if self.dut.name == 'android' and 'disconnect' in variant:
             raise signals.TestSkip(
@@ -119,15 +114,11 @@ class LeSecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
                 + '- When disconnected the `Secure/WaitSecurity` never returns.'
             )
 
-        if self.ref.name == 'android' and ref_address_type == 'against_public':
-            raise signals.TestSkip(
-                'Android does not support PUBLIC address type.'
-            )
+        if self.ref.name == 'android' and ref_address_type_name == 'against_public':
+            raise signals.TestSkip('Android does not support PUBLIC address type.')
 
         if 'reject' in variant or 'rejected' in variant:
-            raise signals.TestSkip(
-                'TODO: Currently these scnearios are not working. Working on them.'
-            )
+            raise signals.TestSkip('TODO: Currently these scnearios are not working. Working on them.')
 
         if isinstance(self.ref, BumblePandoraDevice) and ref_io_capability == 'against_default_io_cap':
             raise signals.TestSkip('Skip default IO cap for Bumble REF.')
@@ -151,9 +142,9 @@ class LeSecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
 
         dut_address_type = RANDOM
         ref_address_type = {
-                'against_random' : RANDOM,
-                'against_public' : PUBLIC,
-            }[ref_address_type]
+            'against_random': RANDOM,
+            'against_public': PUBLIC,
+        }[ref_address_type_name]
 
         # Pandora connection tokens
         ref_dut, dut_ref = None, None
@@ -165,28 +156,32 @@ class LeSecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
 
             # Make LE connection task.
             async def connect_le(
-                initiator: PandoraDevice, acceptor: PandoraDevice,
-                initiator_addr_type: OwnAddressType, acceptor_addr_type: OwnAddressType
+                initiator: PandoraDevice,
+                acceptor: PandoraDevice,
+                initiator_addr_type: OwnAddressType,
+                acceptor_addr_type: OwnAddressType,
             ) -> Tuple[Connection, Connection]:
 
-                #Acceptor - Advertise
+                # Acceptor - Advertise
                 advertisement = acceptor.aio.host.Advertise(
-                                legacy=True,
-                                connectable=True,
-                                own_address_type=acceptor_addr_type,
-                                data=DataTypes(manufacturer_specific_data=b'pause cafe'),
+                    legacy=True,
+                    connectable=True,
+                    own_address_type=acceptor_addr_type,
+                    data=DataTypes(manufacturer_specific_data=b'pause cafe'),
                 )
 
-                #Initiator - Scan and fetch the address
+                # Initiator - Scan and fetch the address
                 scan = initiator.aio.host.Scan(own_address_type=initiator_addr_type)
                 acceptor_addr = await anext(
                     (x async for x in scan if b'pause cafe' in x.data.manufacturer_specific_data)
                 )  # pytype: disable=name-error
                 scan.cancel()
 
-                #Initiator - LE connect
+                # Initiator - LE connect
                 init_res, wait_res = await asyncio.gather(
-                    initiator.aio.host.ConnectLE(own_address_type=initiator_addr_type, **acceptor_addr.address_asdict()),
+                    initiator.aio.host.ConnectLE(
+                        own_address_type=initiator_addr_type, **acceptor_addr.address_asdict()
+                    ),
                     anext(aiter(advertisement)),  # pytype: disable=name-error
                 )
 
@@ -198,10 +193,10 @@ class LeSecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
 
             # Make LE connection.
             if connect == 'incoming_connection':
-                #DUT is acceptor
+                # DUT is acceptor
                 ref_dut, dut_ref = await connect_le(self.ref, self.dut, ref_address_type, dut_address_type)
             else:
-                #DUT is initiator
+                # DUT is initiator
                 dut_ref, ref_dut = await connect_le(self.dut, self.ref, dut_address_type, ref_address_type)
 
             # Pairing.
@@ -211,7 +206,7 @@ class LeSecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
                     self.ref.aio.security.Secure(connection=ref_dut, le=LE_LEVEL3),
                     self.dut.aio.security.WaitSecurity(connection=dut_ref, le=LE_LEVEL3),
                 )
-            #Outgoing pairing
+            # Outgoing pairing
             return await asyncio.gather(
                 self.dut.aio.security.Secure(connection=dut_ref, le=LE_LEVEL3),
                 self.ref.aio.security.WaitSecurity(connection=ref_dut, le=LE_LEVEL3),
