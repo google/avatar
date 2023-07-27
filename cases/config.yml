@@ -1,0 +1,15 @@
+---
+
+TestBeds:
+- Name: android.bumbles
+  Controllers:
+    AndroidDevice: '*'
+    BumbleDevice:
+    - transport: 'tcp-client:127.0.0.1:6211'
+    - transport: 'tcp-client:127.0.0.1:6211'
+- Name: bumble.bumbles
+  Controllers:
+    BumbleDevice:
+    - transport: 'tcp-client:127.0.0.1:6402'
+    - transport: 'tcp-client:127.0.0.1:6402'
+    - transport: 'tcp-client:127.0.0.1:6402'
