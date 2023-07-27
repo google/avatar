@@ -184,7 +184,7 @@ class PandoraClientLoggerAdapter(logging.LoggerAdapter):  # type: ignore
         client = self.extra['client']
         assert isinstance(client, PandoraClient)
         addr = ':'.join([f'{x:02X}' for x in client.address[4:]])
-        return (f'[{client.name}:{addr}] {msg}', kwargs)
+        return (f'[{client.name:<8}:{addr}] {msg}', kwargs)
 
 
 class BumblePandoraClient(PandoraClient):

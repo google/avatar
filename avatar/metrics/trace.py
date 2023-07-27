@@ -121,12 +121,15 @@ class Callsite(AsTrace):
 
         device.log.info(f"{self}")
 
-    def __str__(self) -> str:
+    def pretty(self) -> str:
         name_pretty = self.name[1:].replace('/', '.')
         if self.message is None:
             return f"%{self.id} {name_pretty}"
         message_pretty, _ = debug_message(self.message)
-        return f"%{self.id} {name_pretty}({message_pretty})"
+        return f"{name_pretty}({message_pretty})"
+
+    def __str__(self) -> str:
+        return f"{str2color('╭──', self.id)} {self.pretty()}"
 
     def output(self, message: Any) -> None:
         self.events.append(CallOutput(self, message))
@@ -169,7 +172,7 @@ class CallEvent(AsTrace):
         callsite.device.log.info(f"{self}")
 
     def __str__(self) -> str:
-        return "└── " + self.stringify('->')
+        return f"{str2color('╰──', self.callsite.id)} {self.stringify('──→')}"
 
     def as_trace(self) -> TracePacket:
         return TracePacket(
@@ -189,12 +192,15 @@ class CallEvent(AsTrace):
 
     def stringify(self, direction: str) -> str:
         message_pretty = "" if self.message is None else debug_message(self.message)[0]
-        return f"[{(self.at - self.callsite.at) / 1000000000:.3f}s] {self.callsite} {direction} ({message_pretty})"
+        return (
+            str2color(f"[{(self.at - self.callsite.at) / 1000000000:.3f}s]", self.callsite.id)
+            + f" {self.callsite.pretty()} {str2color(direction, self.callsite.id)} ({message_pretty})"
+        )
 
 
 class CallOutput(CallEvent):
     def __str__(self) -> str:
-        return "├── " + self.stringify('->')
+        return f"{str2color('├──', self.callsite.id)} {self.stringify('──→')}"
 
     def as_trace(self) -> TracePacket:
         return super().as_trace()
@@ -202,7 +208,7 @@ class CallOutput(CallEvent):
 
 class CallInput(CallEvent):
     def __str__(self) -> str:
-        return "├── " + self.stringify('<-')
+        return f"{str2color('├──', self.callsite.id)} {self.stringify('←──')}"
 
     def as_trace(self) -> TracePacket:
         return super().as_trace()
@@ -210,7 +216,7 @@ class CallInput(CallEvent):
 
 class CallEnd(CallEvent):
     def __str__(self) -> str:
-        return "└── " + self.stringify('->')
+        return f"{str2color('╰──', self.callsite.id)} {self.stringify('──→')}"
 
     def as_trace(self) -> TracePacket:
         return TracePacket(
@@ -268,3 +274,11 @@ def debug_message(msg: message.Message) -> Tuple[Dict[str, Any], List[DebugAnnot
             json[f.name] = json_entry
             dbga.append(DebugAnnotation(name=f.name, **dbga_entry))
     return json, dbga
+
+
+def str2color(s: str, id: int) -> str:
+    CSI = "\x1b["
+    CSI_RESET = CSI + "0m"
+    CSI_BOLD = CSI + "1m"
+    color = ((id * 10) % (230 - 17)) + 17
+    return CSI + ("1;38;5;%dm" % color) + CSI_BOLD + s + CSI_RESET
