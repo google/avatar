@@ -1,0 +1,10 @@
+name: "pandora/avatar"
+description:
+    "Avatar aims to provide a scalable multi-platform Bluetooth testing tool "
+    "capable of running any Bluetooth test cases virtually and physically. It "
+    "aims to complete PTS-bot in the Pandora testing suite."
+
+third_party: {
+  type: GOOGLE_INTERNAL
+  license_type: NOTICE
+}

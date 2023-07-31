@@ -1,0 +1,40 @@
+package {
+    default_applicable_licenses: ["external_pandora_avatar_license"],
+}
+
+// Added automatically by a large-scale-change
+// See: http://go/android-license-faq
+license {
+    name: "external_pandora_avatar_license",
+    visibility: [":__subpackages__"],
+    license_kinds: [
+        "SPDX-license-identifier-Apache-2.0",
+    ],
+    license_text: [
+        "LICENSE",
+    ],
+}
+
+python_library_host {
+    name: "libavatar",
+    srcs: [
+        "avatar/*.py",
+        "avatar/controllers/*.py",
+        "avatar/metrics/*.py",
+    ],
+    libs: [
+        "pandora-python",
+        "libprotobuf-python",
+        "bumble",
+        "bumble-pandora",
+        "mobly",
+    ],
+    data: [
+        "avatar/py.typed"
+    ]
+}
+
+filegroup {
+    name: "avatar-cases",
+    srcs: ["cases/*.py"],
+}
