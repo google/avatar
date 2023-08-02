@@ -15,8 +15,10 @@
 """Avatar metrics interceptors."""
 
 import grpc
+import time
 
 from avatar.metrics.trace import Callsite
+from grpc.aio import ClientCallDetails
 from pandora import _utils as utils
 from typing import (
     TYPE_CHECKING,
@@ -56,10 +58,6 @@ def interceptors(device: PandoraClient) -> Sequence[ClientInterceptor]:
 
 def aio_interceptors(device: PandoraClient) -> Sequence[grpc.aio.ClientInterceptor]:
     return [AioUnaryUnaryInterceptor(device), AioUnaryStreamInterceptor(device), AioStreamStreamInterceptor(device)]
-
-
-class ClientCallDetails(Protocol):
-    method: Union[bytes, str]
 
 
 class UnaryOutcome(Protocol, Generic[_T_co]):
@@ -195,6 +193,15 @@ class AioUnaryStreamInterceptor(grpc.aio.UnaryStreamClientInterceptor):  # type:
         client_call_details: ClientCallDetails,
         request: _T,
     ) -> utils.AioStream[_U]:
+
+        # TODO: this is a workaround for https://github.com/grpc/grpc/pull/33951
+        #  need to be deleted as soon as `grpcio` contains the fix.
+        now = time.time()
+        if client_call_details.timeout and client_call_details.timeout > now:
+            client_call_details = client_call_details._replace(
+                timeout=client_call_details.timeout - now,
+            )
+
         callsite = Callsite(self.device, client_call_details.method, request)
         call = await continuation(client_call_details, request)
         call.add_done_callback(lambda _: callsite.end(None))  # type: ignore
@@ -234,6 +241,15 @@ class AioStreamStreamInterceptor(grpc.aio.StreamStreamClientInterceptor):  # typ
         client_call_details: ClientCallDetails,
         request: utils.AioSender[_T],
     ) -> utils.AioStreamStream[_T, _U]:
+
+        # TODO: this is a workaround for https://github.com/grpc/grpc/pull/33951
+        #  need to be deleted as soon as `grpcio` contains the fix.
+        now = time.time()
+        if client_call_details.timeout and client_call_details.timeout > now:
+            client_call_details = client_call_details._replace(
+                timeout=client_call_details.timeout - now,
+            )
+
         callsite = Callsite(self.device, client_call_details.method, None)
 
         class RequestProxy:
