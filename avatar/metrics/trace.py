@@ -14,6 +14,7 @@
 
 """Avatar metrics trace."""
 
+import atexit
 import time
 import types
 
@@ -28,7 +29,8 @@ from avatar.metrics.trace_pb2 import (
 )
 from google.protobuf import any_pb2, message
 from mobly.base_test import BaseTestClass
-from typing import TYPE_CHECKING, Any, Dict, List, Protocol, Tuple, Union
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Tuple, Union
 
 if TYPE_CHECKING:
     from avatar import PandoraDevices
@@ -41,6 +43,7 @@ devices_id: Dict[PandoraClient, int] = {}
 devices_process_id: Dict[PandoraClient, int] = {}
 packets: List[TracePacket] = []
 genesis: int = time.monotonic_ns()
+output_path: Optional[Path] = None
 id: int = 0
 
 
@@ -50,22 +53,24 @@ def next_id() -> int:
     return id
 
 
+@atexit.register
+def dump_trace() -> None:
+    global packets, output_path
+    if output_path is None:
+        return
+    trace = Trace(packet=packets)
+    with open(output_path / "avatar.trace", "wb") as f:
+        f.write(trace.SerializeToString())
+
+
 def hook_test(test: BaseTestClass, devices: PandoraDevices) -> None:
-    global packets
-    original_teardown_class = test.teardown_class
+    global packets, output_path
+
+    if output_path is None:
+        mobly_output_path: str = test.current_test_info.output_path  # type: ignore
+        output_path = (Path(mobly_output_path) / '..' / '..').resolve()  # skip test class and method name
+
     original_setup_test = test.setup_test
-
-    def teardown_class(self: BaseTestClass) -> None:
-        output_path: str = test.current_test_info.output_path  # type: ignore
-        trace = Trace(packet=packets)
-        with open(f"{output_path}/avatar.trace", "wb") as f:
-            f.write(trace.SerializeToString())
-        with open(f"{output_path}/packets.log", "a") as f:
-            for packet in packets:
-                f.write(f"{packet}")
-                f.write("----------\n")
-
-        original_teardown_class()
 
     def setup_test(self: BaseTestClass) -> None:
         global genesis
@@ -76,7 +81,7 @@ def hook_test(test: BaseTestClass, devices: PandoraDevices) -> None:
                 track_descriptor=TrackDescriptor(
                     uuid=process_id,
                     process=ProcessDescriptor(
-                        pid=process_id, process_name=f"{test.__class__.__name__}.{test.current_test_info.name}"
+                        pid=process_id, process_name=f"{self.__class__.__name__}.{self.current_test_info.name}"
                     ),
                 )
             )
@@ -94,7 +99,6 @@ def hook_test(test: BaseTestClass, devices: PandoraDevices) -> None:
 
         original_setup_test()
 
-    test.teardown_class = types.MethodType(teardown_class, test)
     test.setup_test = types.MethodType(setup_test, test)
 
 
@@ -122,7 +126,7 @@ class Callsite(AsTrace):
         device.log.info(f"{self}")
 
     def pretty(self) -> str:
-        name_pretty = self.name[1:].replace('/', '.')
+        name_pretty = self.name[1:].split('.')[-1].replace('/', '.')
         if self.message is None:
             return f"%{self.id} {name_pretty}"
         message_pretty, _ = debug_message(self.message)
@@ -172,7 +176,7 @@ class CallEvent(AsTrace):
         callsite.device.log.info(f"{self}")
 
     def __str__(self) -> str:
-        return f"{str2color('╰──', self.callsite.id)} {self.stringify('──→')}"
+        return f"{str2color('╰──', self.callsite.id)} {self.stringify('⟶ ')}"
 
     def as_trace(self) -> TracePacket:
         return TracePacket(
@@ -200,7 +204,7 @@ class CallEvent(AsTrace):
 
 class CallOutput(CallEvent):
     def __str__(self) -> str:
-        return f"{str2color('├──', self.callsite.id)} {self.stringify('──→')}"
+        return f"{str2color('├──', self.callsite.id)} {self.stringify('⟶ ')}"
 
     def as_trace(self) -> TracePacket:
         return super().as_trace()
@@ -208,7 +212,7 @@ class CallOutput(CallEvent):
 
 class CallInput(CallEvent):
     def __str__(self) -> str:
-        return f"{str2color('├──', self.callsite.id)} {self.stringify('←──')}"
+        return f"{str2color('├──', self.callsite.id)} {self.stringify('⟵ ')}"
 
     def as_trace(self) -> TracePacket:
         return super().as_trace()
@@ -216,7 +220,7 @@ class CallInput(CallEvent):
 
 class CallEnd(CallEvent):
     def __str__(self) -> str:
-        return f"{str2color('╰──', self.callsite.id)} {self.stringify('──→')}"
+        return f"{str2color('╰──', self.callsite.id)} {self.stringify('⟶ ')}"
 
     def as_trace(self) -> TracePacket:
         return TracePacket(
