@@ -17,18 +17,32 @@ import avatar
 import itertools
 import logging
 
-from avatar import BumblePandoraDevice, PandoraDevice, PandoraDevices
+from avatar import BumblePandoraDevice
+from avatar import PandoraDevice
+from avatar import PandoraDevices
 from avatar.common import make_bredr_connection
-from bumble.hci import HCI_CENTRAL_ROLE, HCI_PERIPHERAL_ROLE, HCI_Write_Default_Link_Policy_Settings_Command
+from bumble.hci import HCI_CENTRAL_ROLE
+from bumble.hci import HCI_PERIPHERAL_ROLE
+from bumble.hci import HCI_Write_Default_Link_Policy_Settings_Command
 from bumble.keys import PairingKeys
-from bumble.pairing import PairingConfig, PairingDelegate
-from mobly import base_test, signals, test_runner
+from bumble.pairing import PairingConfig
+from bumble.pairing import PairingDelegate
+from mobly import base_test
+from mobly import signals
+from mobly import test_runner
 from mobly.asserts import assert_equal  # type: ignore
 from mobly.asserts import assert_in  # type: ignore
 from mobly.asserts import assert_is_not_none  # type: ignore
 from mobly.asserts import fail  # type: ignore
-from pandora.host_pb2 import RANDOM, RESOLVABLE_OR_PUBLIC, Connection as PandoraConnection, DataTypes
-from pandora.security_pb2 import LE_LEVEL2, LEVEL2, PairingEventAnswer, SecureResponse, WaitSecurityResponse
+from pandora.host_pb2 import RANDOM
+from pandora.host_pb2 import RESOLVABLE_OR_PUBLIC
+from pandora.host_pb2 import Connection as PandoraConnection
+from pandora.host_pb2 import DataTypes
+from pandora.security_pb2 import LE_LEVEL2
+from pandora.security_pb2 import LEVEL2
+from pandora.security_pb2 import PairingEventAnswer
+from pandora.security_pb2 import SecureResponse
+from pandora.security_pb2 import WaitSecurityResponse
 from typing import Any, List, Literal, Optional, Tuple, Union
 
 DEFAULT_SMP_KEY_DISTRIBUTION = (

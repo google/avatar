@@ -20,14 +20,21 @@ import itertools
 import logging
 import random
 
-from avatar import BumblePandoraDevice, PandoraDevice, PandoraDevices
-from mobly import base_test, test_runner
+from avatar import BumblePandoraDevice
+from avatar import PandoraDevice
+from avatar import PandoraDevices
+from mobly import base_test
+from mobly import test_runner
 from mobly.asserts import assert_equal  # type: ignore
 from mobly.asserts import assert_false  # type: ignore
 from mobly.asserts import assert_is_not_none  # type: ignore
 from mobly.asserts import assert_true  # type: ignore
 from mobly.asserts import explicit_pass  # type: ignore
-from pandora.host_pb2 import PUBLIC, RANDOM, Connection, DataTypes, OwnAddressType
+from pandora.host_pb2 import PUBLIC
+from pandora.host_pb2 import RANDOM
+from pandora.host_pb2 import Connection
+from pandora.host_pb2 import DataTypes
+from pandora.host_pb2 import OwnAddressType
 from typing import Any, Dict, Literal, Optional, Union
 
 

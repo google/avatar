@@ -23,8 +23,10 @@ import portpicker
 import threading
 import types
 
-from avatar.controllers import bumble_device, pandora_device
-from avatar.pandora_client import BumblePandoraClient, PandoraClient
+from avatar.controllers import bumble_device
+from avatar.controllers import pandora_device
+from avatar.pandora_client import BumblePandoraClient
+from avatar.pandora_client import PandoraClient
 from bumble import pandora as bumble_server
 from bumble.pandora.device import PandoraDevice as BumblePandoraDevice
 from contextlib import suppress

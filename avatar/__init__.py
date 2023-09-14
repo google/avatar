@@ -29,7 +29,8 @@ import logging
 from avatar import pandora_server
 from avatar.aio import asynchronous
 from avatar.metrics import trace
-from avatar.pandora_client import BumblePandoraClient as BumblePandoraDevice, PandoraClient as PandoraDevice
+from avatar.pandora_client import BumblePandoraClient as BumblePandoraDevice
+from avatar.pandora_client import PandoraClient as PandoraDevice
 from avatar.pandora_server import PandoraServer
 from mobly import base_test
 from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Sized, Tuple, Type, TypeVar
