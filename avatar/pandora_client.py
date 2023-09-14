@@ -23,12 +23,16 @@ import grpc
 import grpc.aio
 import logging
 
-from avatar.metrics.interceptors import aio_interceptors, interceptors
+from avatar.metrics.interceptors import aio_interceptors
+from avatar.metrics.interceptors import interceptors
 from bumble import pandora as bumble_server
 from bumble.hci import Address as BumbleAddress
 from bumble.pandora.device import PandoraDevice as BumblePandoraDevice
 from dataclasses import dataclass
-from pandora import host_grpc, host_grpc_aio, security_grpc, security_grpc_aio
+from pandora import host_grpc
+from pandora import host_grpc_aio
+from pandora import security_grpc
+from pandora import security_grpc_aio
 from typing import Any, Dict, MutableMapping, Optional, Tuple, Union
 
 

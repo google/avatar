@@ -45,7 +45,8 @@ profile = "black"
 line_length = 119
 no_sections = true
 lines_between_types = 1
-combine_as_imports = true
+force_single_line = true
+single_line_exclusions = ["typing", "typing_extensions", "collections.abc"]
 
 [tool.mypy]
 strict = true

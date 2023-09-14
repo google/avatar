@@ -17,21 +17,23 @@ import avatar
 import grpc
 import logging
 
-from avatar import BumblePandoraDevice, PandoraDevice, PandoraDevices
-from mobly import base_test, signals, test_runner
+from avatar import BumblePandoraDevice
+from avatar import PandoraDevice
+from avatar import PandoraDevices
+from mobly import base_test
+from mobly import signals
+from mobly import test_runner
 from mobly.asserts import assert_equal  # type: ignore
 from mobly.asserts import assert_false  # type: ignore
 from mobly.asserts import assert_is_none  # type: ignore
 from mobly.asserts import assert_is_not_none  # type: ignore
 from mobly.asserts import assert_true  # type: ignore
 from mobly.asserts import explicit_pass  # type: ignore
-from pandora.host_pb2 import (
-    DISCOVERABLE_GENERAL,
-    DISCOVERABLE_LIMITED,
-    NOT_DISCOVERABLE,
-    Connection,
-    DiscoverabilityMode,
-)
+from pandora.host_pb2 import DISCOVERABLE_GENERAL
+from pandora.host_pb2 import DISCOVERABLE_LIMITED
+from pandora.host_pb2 import NOT_DISCOVERABLE
+from pandora.host_pb2 import Connection
+from pandora.host_pb2 import DiscoverabilityMode
 from typing import Optional
 
 

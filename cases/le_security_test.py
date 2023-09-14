@@ -17,16 +17,29 @@ import avatar
 import itertools
 import logging
 
-from avatar import BumblePandoraDevice, PandoraDevice, PandoraDevices
+from avatar import BumblePandoraDevice
+from avatar import PandoraDevice
+from avatar import PandoraDevices
 from avatar.common import make_bredr_connection
-from bumble.pairing import PairingConfig, PairingDelegate
-from mobly import base_test, signals, test_runner
+from bumble.pairing import PairingConfig
+from bumble.pairing import PairingDelegate
+from mobly import base_test
+from mobly import signals
+from mobly import test_runner
 from mobly.asserts import assert_equal  # type: ignore
 from mobly.asserts import assert_in  # type: ignore
 from mobly.asserts import assert_is_not_none  # type: ignore
 from mobly.asserts import fail  # type: ignore
-from pandora.host_pb2 import PUBLIC, RANDOM, Connection, DataTypes, OwnAddressType
-from pandora.security_pb2 import LE_LEVEL3, LEVEL2, PairingEventAnswer, SecureResponse, WaitSecurityResponse
+from pandora.host_pb2 import PUBLIC
+from pandora.host_pb2 import RANDOM
+from pandora.host_pb2 import Connection
+from pandora.host_pb2 import DataTypes
+from pandora.host_pb2 import OwnAddressType
+from pandora.security_pb2 import LE_LEVEL3
+from pandora.security_pb2 import LEVEL2
+from pandora.security_pb2 import PairingEventAnswer
+from pandora.security_pb2 import SecureResponse
+from pandora.security_pb2 import WaitSecurityResponse
 from typing import Any, Literal, Optional, Tuple, Union
 
 

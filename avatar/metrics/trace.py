@@ -18,16 +18,15 @@ import atexit
 import time
 import types
 
-from avatar.metrics.trace_pb2 import (
-    DebugAnnotation,
-    ProcessDescriptor,
-    ThreadDescriptor,
-    Trace,
-    TracePacket,
-    TrackDescriptor,
-    TrackEvent,
-)
-from google.protobuf import any_pb2, message
+from avatar.metrics.trace_pb2 import DebugAnnotation
+from avatar.metrics.trace_pb2 import ProcessDescriptor
+from avatar.metrics.trace_pb2 import ThreadDescriptor
+from avatar.metrics.trace_pb2 import Trace
+from avatar.metrics.trace_pb2 import TracePacket
+from avatar.metrics.trace_pb2 import TrackDescriptor
+from avatar.metrics.trace_pb2 import TrackEvent
+from google.protobuf import any_pb2
+from google.protobuf import message
 from mobly.base_test import BaseTestClass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Tuple, Union
