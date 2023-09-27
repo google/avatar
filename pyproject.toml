@@ -20,6 +20,9 @@ dependencies = [
 [project.urls]
 Source = "https://github.com/google/avatar"
 
+[project.scripts]
+avatar = "avatar:main"
+
 [project.optional-dependencies]
 dev = [
     "rootcanal==1.3.0",
@@ -34,6 +37,9 @@ dev = [
 
 [tool.flit.module]
 name = "avatar"
+
+[tool.flit.sdist]
+include = ["cases/", "doc/"]
 
 [tool.black]
 line-length = 119
