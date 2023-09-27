@@ -40,6 +40,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install
         run: pip install .[dev]
+      - run: mypy
       - run: pyright
   format:
     name: Check Python formatting
