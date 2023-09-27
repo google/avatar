@@ -28,6 +28,7 @@ dev = [
     "rootcanal==1.3.0",
     "grpcio-tools>=1.57",
     "pyright==1.1.298",
+    "mypy==1.5.1",
     "black==23.7.0",
     "isort==5.12.0",
     "types-psutil==5.9.5.16",
@@ -64,6 +65,27 @@ reportMissingTypeStubs = false
 reportUnknownLambdaType = false
 reportImportCycles = false
 reportPrivateUsage = false
+
+[tool.mypy]
+strict = true
+warn_unused_ignores = false
+files = ["avatar", "cases"]
+
+[[tool.mypy.overrides]]
+module = "grpc.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "google.protobuf.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mobly.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "portpicker.*"
+ignore_missing_imports = true
 
 [tool.pytype]
 inputs = ['avatar', 'cases']
