@@ -84,7 +84,7 @@ jobs:
         run: nohup python -m rootcanal > rootcanal.log &
       - name: Test
         run: |
-          python cases/main.py -l | grep -Ev '^=' > test-names.txt
-          timeout 5m python cases/main.py -c cases/config.yml --test_bed bumble.bumbles --tests $(split test-names.txt -n l/${{ matrix.shard }})
+          avatar cases/ --list | grep -Ev '^=' > test-names.txt
+          timeout 5m avatar cases/ --test-beds bumble.bumbles --tests $(split test-names.txt -n l/${{ matrix.shard }})
       - name: Rootcanal Logs
         run: cat rootcanal.log
