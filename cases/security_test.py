@@ -20,6 +20,7 @@ import logging
 from avatar import BumblePandoraDevice
 from avatar import PandoraDevice
 from avatar import PandoraDevices
+from avatar import pandora
 from bumble.hci import HCI_CENTRAL_ROLE
 from bumble.hci import HCI_PERIPHERAL_ROLE
 from bumble.hci import HCI_Write_Default_Link_Policy_Settings_Command
@@ -43,7 +44,6 @@ from pandora.security_pb2 import PairingEventAnswer
 from pandora.security_pb2 import SecureResponse
 from pandora.security_pb2 import WaitSecurityResponse
 from typing import Any, List, Literal, Optional, Tuple, Union
-from utils import make_bredr_connection
 
 DEFAULT_SMP_KEY_DISTRIBUTION = (
     PairingDelegate.KeyDistribution.DISTRIBUTE_ENCRYPTION_KEY
@@ -254,16 +254,16 @@ class SecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
 
             # Make classic connection.
             if connect == 'incoming_connection':
-                ref_dut, dut_ref = await make_bredr_connection(initiator=self.ref, acceptor=self.dut)
+                ref_dut, dut_ref = await pandora.connect(initiator=self.ref, acceptor=self.dut)
             else:
-                dut_ref, ref_dut = await make_bredr_connection(initiator=self.dut, acceptor=self.ref)
+                dut_ref, ref_dut = await pandora.connect(initiator=self.dut, acceptor=self.ref)
 
             # Retrieve Bumble connection
             if isinstance(self.dut, BumblePandoraDevice):
-                dut_ref_bumble = self.dut.device.lookup_connection(int.from_bytes(dut_ref.cookie.value, 'big'))  # type: ignore
+                dut_ref_bumble = pandora.get_raw_connection(self.dut, dut_ref)
             # Role switch.
             if isinstance(self.ref, BumblePandoraDevice):
-                ref_dut_bumble = self.ref.device.lookup_connection(int.from_bytes(ref_dut.cookie.value, 'big'))  # type: ignore
+                ref_dut_bumble = pandora.get_raw_connection(self.ref, ref_dut)
                 if ref_dut_bumble is not None:
                     role = {
                         'against_central': HCI_CENTRAL_ROLE,

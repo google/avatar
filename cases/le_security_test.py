@@ -20,6 +20,7 @@ import logging
 from avatar import BumblePandoraDevice
 from avatar import PandoraDevice
 from avatar import PandoraDevices
+from avatar import pandora
 from bumble.pairing import PairingConfig
 from bumble.pairing import PairingDelegate
 from mobly import base_test
@@ -40,7 +41,6 @@ from pandora.security_pb2 import PairingEventAnswer
 from pandora.security_pb2 import SecureResponse
 from pandora.security_pb2 import WaitSecurityResponse
 from typing import Any, Literal, Optional, Tuple, Union
-from utils import make_bredr_connection
 
 
 class LeSecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
@@ -220,24 +220,13 @@ class LeSecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
 
                 # Initiator - Scan and fetch the address
                 scan = initiator.aio.host.Scan(own_address_type=initiator_addr_type)
-                acceptor_addr = await anext(
+                acceptor_scan = await anext(
                     (x async for x in scan if b'pause cafe' in x.data.manufacturer_specific_data)
                 )  # pytype: disable=name-error
                 scan.cancel()
 
                 # Initiator - LE connect
-                init_res, wait_res = await asyncio.gather(
-                    initiator.aio.host.ConnectLE(
-                        own_address_type=initiator_addr_type, **acceptor_addr.address_asdict()
-                    ),
-                    anext(aiter(advertisement)),  # pytype: disable=name-error
-                )
-
-                advertisement.cancel()
-                assert_equal(init_res.result_variant(), 'connection')
-
-                assert init_res.connection is not None and wait_res.connection is not None
-                return init_res.connection, wait_res.connection
+                return await pandora.connect_le(initiator, advertisement, acceptor_scan, initiator_addr_type)
 
             # Make LE connection.
             if connect == 'incoming_connection':
@@ -379,7 +368,7 @@ class LeSecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
                     assert_equal(wait_security.result_variant(), 'success')
                     if 'lk' in key_distribution:
                         # Make a Classic connection
-                        ref_dut_classic, _dut_ref_clsssic = await make_bredr_connection(self.ref, self.dut)
+                        ref_dut_classic, _dut_ref_clsssic = await pandora.connect(self.ref, self.dut)
                         # Try to encrypt Classic connection
                         ref_dut_secure = await self.ref.aio.security.Secure(ref_dut_classic, classic=LEVEL2)
                         assert_equal(ref_dut_secure.result_variant(), 'success')
