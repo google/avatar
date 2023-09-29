@@ -40,7 +40,7 @@ dev = [
 name = "avatar"
 
 [tool.flit.sdist]
-include = ["cases/", "doc/"]
+include = ["doc/"]
 
 [tool.black]
 line-length = 119
@@ -56,7 +56,7 @@ force_single_line = true
 single_line_exclusions = ["typing", "typing_extensions", "collections.abc"]
 
 [tool.pyright]
-include = ["avatar", "cases"]
+include = ["avatar"]
 exclude = ["**/__pycache__", "**/*_pb2.py"]
 typeCheckingMode = "strict"
 useLibraryCodeForTypes = true
@@ -69,7 +69,7 @@ reportPrivateUsage = false
 [tool.mypy]
 strict = true
 warn_unused_ignores = false
-files = ["avatar", "cases"]
+files = ["avatar"]
 
 [[tool.mypy.overrides]]
 module = "grpc.*"
@@ -88,7 +88,7 @@ module = "portpicker.*"
 ignore_missing_imports = true
 
 [tool.pytype]
-inputs = ['avatar', 'cases']
+inputs = ['avatar']
 
 [build-system]
 requires = ["flit_core==3.7.1"]
