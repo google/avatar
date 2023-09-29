@@ -55,8 +55,8 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install .[dev]
-      - run: black --check avatar/ cases/
-      - run: isort --check avatar/ cases/
+      - run: black --check avatar/
+      - run: isort --check avatar
   test:
     name: Test Bumble vs Bumble(s) [${{ matrix.shard }}]
     runs-on: ubuntu-latest

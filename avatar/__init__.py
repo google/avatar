@@ -299,7 +299,7 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
     if argv.verbose:
         runner.set_logs_verbose()
     if not argv.no_default_cases:
-        runner.add_path(pathlib.Path(__file__).resolve().parent.parent / 'cases')
+        runner.add_path(pathlib.Path(__file__).resolve().parent / 'cases')
 
     # List tests to standard output.
     if argv.list:
