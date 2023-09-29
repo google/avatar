@@ -236,7 +236,7 @@ def args_parser() -> argparse.ArgumentParser:
         nargs='*',
         metavar='<PATH>',
         help='Lits of folder or test file to run',
-        default=['.'],
+        default=[],
     )
     parser.add_argument('-c', '--config', type=str, metavar='<PATH>', help='Path to the test configuration file.')
     parser.add_argument(
@@ -271,8 +271,8 @@ def args_parser() -> argparse.ArgumentParser:
         metavar='[<TEST BED NAME1> <TEST BED NAME2> ...]',
         help='Specify which test beds to run tests on.',
     )
-
     parser.add_argument('-v', '--verbose', action='store_true', help='Set console logger level to DEBUG')
+    parser.add_argument('-x', '--no-default-cases', action='store_true', help='Dot no include default test cases')
     return parser
 
 
@@ -298,6 +298,8 @@ def main(args: Optional[argparse.Namespace] = None) -> None:
         runner.add_test_beds(argv.test_beds)
     if argv.verbose:
         runner.set_logs_verbose()
+    if not argv.no_default_cases:
+        runner.add_path(pathlib.Path(__file__).resolve().parent.parent / 'cases')
 
     # List tests to standard output.
     if argv.list:
