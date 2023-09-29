@@ -79,11 +79,6 @@ async def le_connect_with_rpa_and_encrypt(central: PandoraDevice, peripheral: Pa
     encryption = await peripheral.aio.security.Secure(connection=per_cen, le=LE_LEVEL2)
     assert_equal(encryption.result_variant(), 'success')
 
-    await asyncio.gather(
-        central.aio.host.Disconnect(connection=cen_per),
-        peripheral.aio.host.WaitDisconnection(connection=per_cen),
-    )
-
 
 class SecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
     '''
