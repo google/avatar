@@ -35,15 +35,10 @@ class SuiteRunner:
     test_run_configs: List[config_parser.TestRunConfig] = []
     test_classes: List[Type[base_test.BaseTestClass]] = []
     test_filters: List[str] = []
-    logs_dir: pathlib.Path
+    logs_dir: pathlib.Path = pathlib.Path('out')
     logs_verbose: bool = False
 
-    def __init__(self) -> None:
-        self.set_logs_dir(pathlib.Path('out'))
-
     def set_logs_dir(self, path: pathlib.Path) -> None:
-        if not path.exists():
-            path.mkdir()
         self.logs_dir = path
 
     def set_logs_verbose(self, verbose: bool = True) -> None:
@@ -108,6 +103,10 @@ class SuiteRunner:
         return result
 
     def run(self) -> bool:
+        # Create logs directory.
+        if not self.logs_dir.exists():
+            self.logs_dir.mkdir()
+
         # Enable Bumble snoop logs.
         os.environ.setdefault('BUMBLE_SNOOPER', f'btsnoop:file:{self.logs_dir}/{_BUMBLE_BTSNOOP_FMT}')
 
