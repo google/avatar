@@ -368,7 +368,15 @@ class LeSecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
                     assert_equal(wait_security.result_variant(), 'success')
                     if 'lk' in key_distribution:
                         # Make a Classic connection
-                        ref_dut_classic, _dut_ref_clsssic = await pandora.connect(self.ref, self.dut)
+                        if self.dut.name == 'android':
+                            # Android IOP: Android automatically trigger a BR/EDR connection request
+                            # in this case.
+                            ref_dut_classic_res = await self.ref.aio.host.WaitConnection(self.dut.address)
+                            assert_is_not_none(ref_dut_classic_res.connection)
+                            assert ref_dut_classic_res.connection
+                            ref_dut_classic = ref_dut_classic_res.connection
+                        else:
+                            ref_dut_classic, _ = await pandora.connect(self.ref, self.dut)
                         # Try to encrypt Classic connection
                         ref_dut_secure = await self.ref.aio.security.Secure(ref_dut_classic, classic=LEVEL2)
                         assert_equal(ref_dut_secure.result_variant(), 'success')
