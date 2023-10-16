@@ -61,6 +61,7 @@ class LeHostTest(base_test.BaseTestClass):  # type: ignore[misc]
     def setup_class(self) -> None:
         self.devices = PandoraDevices(self)
         self.dut, self.ref, *_ = self.devices
+        self.scan_timeout = float(self.user_params.get('scan_timeout') or 15.0)  # type: ignore
 
         # Enable BR/EDR mode for Bumble devices.
         for device in self.devices:
@@ -113,7 +114,7 @@ class LeHostTest(base_test.BaseTestClass):  # type: ignore[misc]
             own_address_type=PUBLIC,
         )
 
-        scan = self.dut.host.Scan(legacy=False, passive=False, timeout=5.0)
+        scan = self.dut.host.Scan(legacy=False, passive=False, timeout=self.scan_timeout)
         report = next((x for x in scan if x.public == self.ref.address))
         try:
             report = next((x for x in scan if x.public == self.ref.address))
@@ -173,7 +174,7 @@ class LeHostTest(base_test.BaseTestClass):  # type: ignore[misc]
             own_address_type=PUBLIC,
         )
 
-        scan = self.dut.host.Scan(legacy=False, passive=False)
+        scan = self.dut.host.Scan(legacy=False, passive=False, timeout=self.scan_timeout)
         report = next((x for x in scan if x.public == self.ref.address))
 
         scan.cancel()
@@ -198,13 +199,13 @@ class LeHostTest(base_test.BaseTestClass):  # type: ignore[misc]
             data=DataTypes(manufacturer_specific_data=b'pause cafe'),
         )
 
-        scan = self.dut.aio.host.Scan(own_address_type=RANDOM)
+        scan = self.dut.aio.host.Scan(own_address_type=RANDOM, timeout=self.scan_timeout)
         ref = await anext((x async for x in scan if x.data.manufacturer_specific_data == b'pause cafe'))
         scan.cancel()
 
         ref_dut_res, dut_ref_res = await asyncio.gather(
             anext(aiter(advertise)),
-            self.dut.aio.host.ConnectLE(**ref.address_asdict(), own_address_type=RANDOM),
+            self.dut.aio.host.ConnectLE(**ref.address_asdict(), own_address_type=RANDOM, timeout=self.scan_timeout),
         )
         assert_equal(dut_ref_res.result_variant(), 'connection')
         dut_ref, ref_dut = dut_ref_res.connection, ref_dut_res.connection
@@ -226,13 +227,13 @@ class LeHostTest(base_test.BaseTestClass):  # type: ignore[misc]
             data=DataTypes(manufacturer_specific_data=b'pause cafe'),
         )
 
-        scan = self.dut.aio.host.Scan(own_address_type=RANDOM)
+        scan = self.dut.aio.host.Scan(own_address_type=RANDOM, timeout=self.scan_timeout)
         ref = await anext((x async for x in scan if x.data.manufacturer_specific_data == b'pause cafe'))
         scan.cancel()
 
         ref_dut_res, dut_ref_res = await asyncio.gather(
             anext(aiter(advertise)),
-            self.dut.aio.host.ConnectLE(**ref.address_asdict(), own_address_type=RANDOM),
+            self.dut.aio.host.ConnectLE(**ref.address_asdict(), own_address_type=RANDOM, timeout=self.scan_timeout),
         )
         assert_equal(dut_ref_res.result_variant(), 'connection')
         dut_ref, ref_dut = dut_ref_res.connection, ref_dut_res.connection
