@@ -20,7 +20,7 @@ import logging
 from avatar import BumblePandoraDevice
 from avatar import PandoraDevice
 from avatar import PandoraDevices
-from avatar import pandora
+from avatar import pandora_snippet
 from bumble.hci import HCI_CENTRAL_ROLE
 from bumble.hci import HCI_PERIPHERAL_ROLE
 from bumble.hci import HCI_Write_Default_Link_Policy_Settings_Command
@@ -249,16 +249,16 @@ class SecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
 
             # Make classic connection.
             if connect == 'incoming_connection':
-                ref_dut, dut_ref = await pandora.connect(initiator=self.ref, acceptor=self.dut)
+                ref_dut, dut_ref = await pandora_snippet.connect(initiator=self.ref, acceptor=self.dut)
             else:
-                dut_ref, ref_dut = await pandora.connect(initiator=self.dut, acceptor=self.ref)
+                dut_ref, ref_dut = await pandora_snippet.connect(initiator=self.dut, acceptor=self.ref)
 
             # Retrieve Bumble connection
             if isinstance(self.dut, BumblePandoraDevice):
-                dut_ref_bumble = pandora.get_raw_connection(self.dut, dut_ref)
+                dut_ref_bumble = pandora_snippet.get_raw_connection(self.dut, dut_ref)
             # Role switch.
             if isinstance(self.ref, BumblePandoraDevice):
-                ref_dut_bumble = pandora.get_raw_connection(self.ref, ref_dut)
+                ref_dut_bumble = pandora_snippet.get_raw_connection(self.ref, ref_dut)
                 if ref_dut_bumble is not None:
                     role = {
                         'against_central': HCI_CENTRAL_ROLE,

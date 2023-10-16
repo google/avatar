@@ -20,7 +20,7 @@ import logging
 from avatar import BumblePandoraDevice
 from avatar import PandoraDevice
 from avatar import PandoraDevices
-from avatar import pandora
+from avatar import pandora_snippet
 from bumble.pairing import PairingConfig
 from bumble.pairing import PairingDelegate
 from mobly import base_test
@@ -226,7 +226,7 @@ class LeSecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
                 scan.cancel()
 
                 # Initiator - LE connect
-                return await pandora.connect_le(initiator, advertisement, acceptor_scan, initiator_addr_type)
+                return await pandora_snippet.connect_le(initiator, advertisement, acceptor_scan, initiator_addr_type)
 
             # Make LE connection.
             if connect == 'incoming_connection':
@@ -376,7 +376,7 @@ class LeSecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
                             assert ref_dut_classic_res.connection
                             ref_dut_classic = ref_dut_classic_res.connection
                         else:
-                            ref_dut_classic, _ = await pandora.connect(self.ref, self.dut)
+                            ref_dut_classic, _ = await pandora_snippet.connect(self.ref, self.dut)
                         # Try to encrypt Classic connection
                         ref_dut_secure = await self.ref.aio.security.Secure(ref_dut_classic, classic=LEVEL2)
                         assert_equal(ref_dut_secure.result_variant(), 'success')
