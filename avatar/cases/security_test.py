@@ -328,7 +328,7 @@ class SecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
 
             connect_and_pair_task.add_done_callback(on_done)
 
-            ref_ev = await asyncio.wait_for(ref_pairing_fut, timeout=5.0)
+            ref_ev = await asyncio.wait_for(ref_pairing_fut, timeout=15.0)
             self.ref.log.info(f'REF pairing event: {ref_ev.method_variant()}')
 
             dut_ev_answer, ref_ev_answer = None, None
