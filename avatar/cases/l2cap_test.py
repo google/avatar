@@ -19,25 +19,14 @@ import logging
 from avatar import BumblePandoraDevice
 from avatar import PandoraDevice
 from avatar import PandoraDevices
-from avatar.common import make_bredr_connection
-from avatar.common import make_le_connection
+from avatar import pandora_snippet
 from mobly import base_test
 from mobly import test_runner
 from mobly.asserts import assert_equal  # type: ignore
 from mobly.asserts import assert_is_not_none  # type: ignore
 from pandora import host_pb2
-from pandora import l2cap_pb2
-from typing import Any, Awaitable, Callable, Dict, Literal, Optional, Tuple, Union
+from typing import Any, Dict, Optional
 
-CONNECTORS: Dict[
-    str,
-    Callable[[avatar.PandoraDevice, avatar.PandoraDevice], Awaitable[Tuple[host_pb2.Connection, host_pb2.Connection]]],
-] = {
-    'Classic': make_bredr_connection,
-    'LE': make_le_connection,
-}
-
-FIXED_CHANNEL_CID = 0x3E
 CLASSIC_PSM = 0xFEFF
 LE_SPSM = 0xF0
 
@@ -48,6 +37,10 @@ class L2capTest(base_test.BaseTestClass):  # type: ignore[misc]
     # pandora devices.
     dut: PandoraDevice
     ref: PandoraDevice
+
+    # BR/EDR & Low-Energy connections.
+    dut_ref: Dict[str, host_pb2.Connection] = {}
+    ref_dut: Dict[str, host_pb2.Connection] = {}
 
     def setup_class(self) -> None:
         self.devices = PandoraDevices(self)
@@ -66,160 +59,122 @@ class L2capTest(base_test.BaseTestClass):  # type: ignore[misc]
     async def setup_test(self) -> None:  # pytype: disable=wrong-arg-types
         await asyncio.gather(self.dut.reset(), self.ref.reset())
 
+        # Connect REF to DUT in both BR/EDR and Low-Energy.
+        ref_dut_br, dut_ref_br = await pandora_snippet.connect(self.ref, self.dut)
+        ref_dut_le, dut_ref_le = await pandora_snippet.connect_le_dummy(self.ref, self.dut)
+
+        self.dut_ref = dict(basic=dut_ref_br, le_credit_based=dut_ref_le)
+        self.ref_dut = dict(basic=ref_dut_br, le_credit_based=ref_dut_le)
+
     @avatar.parameterized(
-        ('Classic', dict(fixed=l2cap_pb2.FixedChannelRequest(cid=FIXED_CHANNEL_CID))),
-        ('LE', dict(fixed=l2cap_pb2.FixedChannelRequest(cid=FIXED_CHANNEL_CID))),
-        ('Classic', dict(basic=l2cap_pb2.ConnectionOrientedChannelRequest(psm=CLASSIC_PSM))),
-        (
-            'LE',
-            dict(
-                le_credit_based=l2cap_pb2.CreditBasedChannelRequest(
-                    spsm=LE_SPSM, mtu=2046, mps=2048, initial_credit=256
-                )
-            ),
-        ),
+        (dict(basic=dict(psm=CLASSIC_PSM)),),
+        (dict(le_credit_based=dict(spsm=LE_SPSM, mtu=2046, mps=2048, initial_credit=256)),),
     )  # type: ignore[misc]
     @avatar.asynchronous
     async def test_connect(
         self,
-        transport: Union[Literal['Classic'], Literal['LE']],
         request: Dict[str, Any],
     ) -> None:
-        dut_ref_acl, ref_dut_acl = await CONNECTORS[transport](self.dut, self.ref)
-        server = self.ref.aio.l2cap.OnConnection(connection=ref_dut_acl, **request)
-        ref_dut_res, dut_ref_res = await asyncio.gather(
-            anext(aiter(server)),
-            self.dut.aio.l2cap.Connect(connection=dut_ref_acl, **request),
+        transport = next(iter(request.keys()))
+        ref_dut, dut_ref = await asyncio.gather(
+            self.ref.aio.l2cap.WaitConnection(connection=self.ref_dut[transport], **request),
+            self.dut.aio.l2cap.Connect(connection=self.dut_ref[transport], **request),
         )
-        assert_is_not_none(ref_dut_res.channel)
-        assert_is_not_none(dut_ref_res.channel)
+        assert_is_not_none(ref_dut.channel)
+        assert_is_not_none(dut_ref.channel)
 
     @avatar.parameterized(
-        ('Classic', dict(fixed=l2cap_pb2.FixedChannelRequest(cid=FIXED_CHANNEL_CID))),
-        ('LE', dict(fixed=l2cap_pb2.FixedChannelRequest(cid=FIXED_CHANNEL_CID))),
-        ('Classic', dict(basic=l2cap_pb2.ConnectionOrientedChannelRequest(psm=CLASSIC_PSM))),
-        (
-            'LE',
-            dict(
-                le_credit_based=l2cap_pb2.CreditBasedChannelRequest(
-                    spsm=LE_SPSM, mtu=2046, mps=2048, initial_credit=256
-                )
-            ),
-        ),
+        (dict(basic=dict(psm=CLASSIC_PSM)),),
+        (dict(le_credit_based=dict(spsm=LE_SPSM, mtu=2046, mps=2048, initial_credit=256)),),
     )  # type: ignore[misc]
     @avatar.asynchronous
-    async def test_on_connection(
+    async def test_wait_connection(
         self,
-        transport: Union[Literal['Classic'], Literal['LE']],
         request: Dict[str, Any],
     ) -> None:
-        dut_ref_acl, ref_dut_acl = await CONNECTORS[transport](self.dut, self.ref)
-        server = self.dut.aio.l2cap.OnConnection(connection=dut_ref_acl, **request)
-        ref_dut_res, dut_ref_res = await asyncio.gather(
-            self.ref.aio.l2cap.Connect(connection=ref_dut_acl, **request),
-            anext(aiter(server)),
+        transport = next(iter(request.keys()))
+        dut_ref, ref_dut = await asyncio.gather(
+            self.ref.aio.l2cap.WaitConnection(connection=self.dut_ref[transport], **request),
+            self.dut.aio.l2cap.Connect(connection=self.ref_dut[transport], **request),
         )
-        assert_is_not_none(ref_dut_res.channel)
-        assert_is_not_none(dut_ref_res.channel)
+        assert_is_not_none(ref_dut.channel)
+        assert_is_not_none(dut_ref.channel)
 
     @avatar.parameterized(
-        ('Classic', dict(basic=l2cap_pb2.ConnectionOrientedChannelRequest(psm=CLASSIC_PSM))),
-        (
-            'LE',
-            dict(
-                le_credit_based=l2cap_pb2.CreditBasedChannelRequest(
-                    spsm=LE_SPSM, mtu=2046, mps=2048, initial_credit=256
-                )
-            ),
-        ),
+        (dict(basic=dict(psm=CLASSIC_PSM)),),
+        (dict(le_credit_based=dict(spsm=LE_SPSM, mtu=2046, mps=2048, initial_credit=256)),),
     )  # type: ignore[misc]
     @avatar.asynchronous
     async def test_disconnect(
         self,
-        transport: Union[Literal['Classic'], Literal['LE']],
         request: Dict[str, Any],
     ) -> None:
-        dut_ref_acl, ref_dut_acl = await CONNECTORS[transport](self.dut, self.ref)
-        server = self.ref.aio.l2cap.OnConnection(connection=ref_dut_acl, **request)
-        ref_dut_res, dut_ref_res = await asyncio.gather(
-            anext(aiter(server)),
-            self.dut.aio.l2cap.Connect(connection=dut_ref_acl, **request),
+        transport = next(iter(request.keys()))
+        dut_ref, ref_dut = await asyncio.gather(
+            self.ref.aio.l2cap.WaitConnection(connection=self.dut_ref[transport], **request),
+            self.dut.aio.l2cap.Connect(connection=self.ref_dut[transport], **request),
         )
-        assert dut_ref_res.channel and ref_dut_res.channel
+        assert_is_not_none(ref_dut.channel)
+        assert_is_not_none(dut_ref.channel)
+        assert ref_dut.channel and dut_ref.channel
 
-        await asyncio.gather(
-            self.dut.aio.l2cap.Disconnect(channel=dut_ref_res.channel),
-            self.ref.aio.l2cap.WaitDisconnection(channel=ref_dut_res.channel),
+        _, dis = await asyncio.gather(
+            self.ref.aio.l2cap.WaitDisconnection(channel=ref_dut.channel),
+            self.dut.aio.l2cap.Disconnect(channel=dut_ref.channel),
         )
+
+        assert_equal(dis.result_variant(), 'success')
 
     @avatar.parameterized(
-        ('Classic', dict(basic=l2cap_pb2.ConnectionOrientedChannelRequest(psm=CLASSIC_PSM))),
-        (
-            'LE',
-            dict(
-                le_credit_based=l2cap_pb2.CreditBasedChannelRequest(
-                    spsm=LE_SPSM, mtu=2046, mps=2048, initial_credit=256
-                )
-            ),
-        ),
+        (dict(basic=dict(psm=CLASSIC_PSM)),),
+        (dict(le_credit_based=dict(spsm=LE_SPSM, mtu=2046, mps=2048, initial_credit=256)),),
     )  # type: ignore[misc]
     @avatar.asynchronous
     async def test_wait_disconnection(
         self,
-        transport: Union[Literal['Classic'], Literal['LE']],
         request: Dict[str, Any],
     ) -> None:
-        dut_ref_acl, ref_dut_acl = await CONNECTORS[transport](self.dut, self.ref)
-        server = self.ref.aio.l2cap.OnConnection(connection=ref_dut_acl, **request)
-        ref_dut_res, dut_ref_res = await asyncio.gather(
-            anext(aiter(server)),
-            self.dut.aio.l2cap.Connect(connection=dut_ref_acl, **request),
+        transport = next(iter(request.keys()))
+        dut_ref, ref_dut = await asyncio.gather(
+            self.ref.aio.l2cap.WaitConnection(connection=self.dut_ref[transport], **request),
+            self.dut.aio.l2cap.Connect(connection=self.ref_dut[transport], **request),
         )
-        assert dut_ref_res.channel and ref_dut_res.channel
+        assert_is_not_none(ref_dut.channel)
+        assert_is_not_none(dut_ref.channel)
+        assert ref_dut.channel and dut_ref.channel
 
-        await asyncio.gather(
-            self.ref.aio.l2cap.Disconnect(channel=ref_dut_res.channel),
-            self.dut.aio.l2cap.WaitDisconnection(channel=dut_ref_res.channel),
+        dis, _ = await asyncio.gather(
+            self.dut.aio.l2cap.WaitDisconnection(channel=dut_ref.channel),
+            self.ref.aio.l2cap.Disconnect(channel=ref_dut.channel),
         )
+
+        assert_equal(dis.result_variant(), 'success')
 
     @avatar.parameterized(
-        ('Classic', dict(fixed=l2cap_pb2.FixedChannelRequest(cid=FIXED_CHANNEL_CID))),
-        ('LE', dict(fixed=l2cap_pb2.FixedChannelRequest(cid=FIXED_CHANNEL_CID))),
-        ('Classic', dict(basic=l2cap_pb2.ConnectionOrientedChannelRequest(psm=CLASSIC_PSM))),
-        (
-            'LE',
-            dict(
-                le_credit_based=l2cap_pb2.CreditBasedChannelRequest(
-                    spsm=LE_SPSM, mtu=2046, mps=2048, initial_credit=256
-                )
-            ),
-        ),
+        (dict(basic=dict(psm=CLASSIC_PSM)),),
+        (dict(le_credit_based=dict(spsm=LE_SPSM, mtu=2046, mps=2048, initial_credit=256)),),
     )  # type: ignore[misc]
     @avatar.asynchronous
     async def test_send(
         self,
-        transport: Union[Literal['Classic'], Literal['LE']],
         request: Dict[str, Any],
     ) -> None:
-        dut_ref_acl, ref_dut_acl = await CONNECTORS[transport](self.dut, self.ref)
-        server = self.dut.aio.l2cap.OnConnection(connection=dut_ref_acl, **request)
-        ref_dut_res, dut_ref_res = await asyncio.gather(
-            self.ref.aio.l2cap.Connect(connection=ref_dut_acl, **request),
-            anext(aiter(server)),
+        transport = next(iter(request.keys()))
+        dut_ref, ref_dut = await asyncio.gather(
+            self.ref.aio.l2cap.WaitConnection(connection=self.dut_ref[transport], **request),
+            self.dut.aio.l2cap.Connect(connection=self.ref_dut[transport], **request),
         )
-        ref_dut_channel = ref_dut_res.channel
-        dut_ref_channel = dut_ref_res.channel
-        assert_is_not_none(ref_dut_res.channel)
-        assert_is_not_none(dut_ref_res.channel)
-        assert ref_dut_channel and dut_ref_channel
+        assert_is_not_none(ref_dut.channel)
+        assert_is_not_none(dut_ref.channel)
+        assert ref_dut.channel and dut_ref.channel
 
-        dut_ref_stream = self.ref.aio.l2cap.Receive(channel=dut_ref_channel)
-        _send_res, recv_res = await asyncio.gather(
-            self.dut.aio.l2cap.Send(channel=ref_dut_channel, data=b"The quick brown fox jumps over the lazy dog"),
-            anext(aiter(dut_ref_stream)),
+        ref_source = self.ref.aio.l2cap.Receive(channel=dut_ref.channel)
+        _, recv = await asyncio.gather(
+            self.dut.aio.l2cap.Send(channel=ref_dut.channel, data=b"The quick brown fox jumps over the lazy dog"),
+            anext(aiter(ref_source)),
         )
-        assert recv_res.data
-        assert_equal(recv_res.data, b"The quick brown fox jumps over the lazy dog")
+
+        assert_equal(recv.data, b"The quick brown fox jumps over the lazy dog")
 
 
 if __name__ == "__main__":

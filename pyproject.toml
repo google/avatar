@@ -9,8 +9,8 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License"
 ]
 dependencies = [
-    "bt-test-interfaces>=0.0.4",
-    "bumble>=0.0.176",
+    "bumble@git+https://github.com/google/bumble@uael/l2cap_pandora",
+    "bt-test-interfaces@git+https://github.com/google/bt-test-interfaces@uael/l2cap-update#subdirectory=python",
     "protobuf==4.24.2",
     "grpcio==1.57",
     "mobly==1.12.2",

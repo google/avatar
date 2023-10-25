@@ -20,8 +20,10 @@ from bumble.device import Connection as BumbleConnection
 from mobly.asserts import assert_equal  # type: ignore
 from mobly.asserts import assert_is_not_none  # type: ignore
 from pandora._utils import AioStream
+from pandora.host_pb2 import RANDOM
 from pandora.host_pb2 import AdvertiseResponse
 from pandora.host_pb2 import Connection
+from pandora.host_pb2 import DataTypes
 from pandora.host_pb2 import OwnAddressType
 from pandora.host_pb2 import ScanningResponse
 from typing import Optional, Tuple
@@ -65,3 +67,29 @@ async def connect_le(
     assert_is_not_none(init_res.connection)
     assert init_res.connection
     return init_res.connection, wait_res.connection
+
+
+# Make LE connection task.
+async def connect_le_dummy(
+    initiator: PandoraDevice,
+    acceptor: PandoraDevice,
+    initiator_addr_type: OwnAddressType = RANDOM,
+    acceptor_addr_type: OwnAddressType = RANDOM,
+) -> Tuple[Connection, Connection]:
+    # Acceptor - Advertise
+    advertisement = acceptor.aio.host.Advertise(
+        legacy=True,
+        connectable=True,
+        own_address_type=acceptor_addr_type,
+        data=DataTypes(manufacturer_specific_data=b'pause cafe'),
+    )
+
+    # Initiator - Scan and fetch the address
+    scan = initiator.aio.host.Scan(own_address_type=initiator_addr_type)
+    acceptor_scan = await anext(
+        (x async for x in scan if b'pause cafe' in x.data.manufacturer_specific_data)
+    )  # pytype: disable=name-error
+    scan.cancel()
+
+    # Initiator - LE connect
+    return await connect_le(initiator, advertisement, acceptor_scan, initiator_addr_type)
