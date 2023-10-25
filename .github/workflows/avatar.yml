@@ -86,6 +86,7 @@ jobs:
       - name: Test
         run: |
           avatar --list | grep -Ev '^=' > test-names.txt
+          split test-names.txt -n l/${{ matrix.shard }}
           timeout 5m avatar --test-beds bumble.bumbles --tests $(split test-names.txt -n l/${{ matrix.shard }})
       - name: Rootcanal Logs
         run: cat rootcanal.log
