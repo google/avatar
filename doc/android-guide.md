@@ -31,7 +31,7 @@ from the root of your Android repository:
 
 ```shell
 source build/envsetup.sh
-lunch aosp_cf_x86_64_phone-userdebug
+lunch aosp_cf_x86_64_phone-trunk_staging-userdebug
 acloud create --local-image --local-instance
 ```
 
