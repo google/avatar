@@ -98,7 +98,7 @@ class CodelabTest(base_test.BaseTestClass):
     # Method to set up the DUT and REF devices for the test (called once).
     def setup_class(self) -> None:
         self.devices = PandoraDevices(self)  # Create Pandora devices from the config.
-        self.dut, ref = self.devices
+        self.dut, ref, *_ = self.devices
         assert isinstance(ref, BumblePandoraClient)  # REF device is a Bumble device.
         self.ref = ref
 
