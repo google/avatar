@@ -81,8 +81,7 @@ For example, using another Android device to emulate an interoperability
 behavior of a specific headset would require building dedicated hooks in the
 Android Bluetooth stack and the corresponding APIs which wouldn't be practical.
 
-However, other setups are also supported (see [Extended architecture](
-#extended-architecture)).
+However, other setups are also supported (see [Extended architecture](#extended-architecture)).
 
 ## Types of Avatar tests
 
