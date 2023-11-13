@@ -35,6 +35,7 @@ from pandora.host_pb2 import RANDOM
 from pandora.host_pb2 import Connection
 from pandora.host_pb2 import DataTypes
 from pandora.host_pb2 import OwnAddressType
+from pandora.host_pb2 import ScanningResponse
 from typing import Any, Dict, Literal, Optional, Union
 
 
@@ -200,12 +201,12 @@ class LeHostTest(base_test.BaseTestClass):  # type: ignore[misc]
         )
 
         scan = self.dut.aio.host.Scan(own_address_type=RANDOM, timeout=self.scan_timeout)
-        ref = await anext((x async for x in scan if x.data.manufacturer_specific_data == b'pause cafe'))
+        ref: ScanningResponse = await anext((x async for x in scan if x.data.manufacturer_specific_data == b'pause cafe'))
         scan.cancel()
 
         ref_dut_res, dut_ref_res = await asyncio.gather(
             anext(aiter(advertise)),
-            self.dut.aio.host.ConnectLE(**ref.address_asdict(), own_address_type=RANDOM, timeout=self.scan_timeout),
+            self.dut.aio.host.ConnectLE(public=ref.public, public_identity=ref.public_identity, random=ref.random, random_static_identity=ref.random_static_identity, own_address_type=RANDOM, timeout=self.scan_timeout),
         )
         assert_equal(dut_ref_res.result_variant(), 'connection')
         dut_ref, ref_dut = dut_ref_res.connection, ref_dut_res.connection
@@ -228,12 +229,12 @@ class LeHostTest(base_test.BaseTestClass):  # type: ignore[misc]
         )
 
         scan = self.dut.aio.host.Scan(own_address_type=RANDOM, timeout=self.scan_timeout)
-        ref = await anext((x async for x in scan if x.data.manufacturer_specific_data == b'pause cafe'))
+        ref: ScanningResponse = await anext((x async for x in scan if x.data.manufacturer_specific_data == b'pause cafe'))
         scan.cancel()
 
         ref_dut_res, dut_ref_res = await asyncio.gather(
             anext(aiter(advertise)),
-            self.dut.aio.host.ConnectLE(**ref.address_asdict(), own_address_type=RANDOM, timeout=self.scan_timeout),
+            self.dut.aio.host.ConnectLE(public=ref.public, public_identity=ref.public_identity, random=ref.random, random_static_identity=ref.random_static_identity, own_address_type=RANDOM, timeout=self.scan_timeout),
         )
         assert_equal(dut_ref_res.result_variant(), 'connection')
         dut_ref, ref_dut = dut_ref_res.connection, ref_dut_res.connection
