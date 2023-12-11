@@ -32,9 +32,6 @@ from mobly.asserts import assert_is_not_none  # type: ignore
 from mobly.asserts import fail  # type: ignore
 from pandora.host_pb2 import PUBLIC
 from pandora.host_pb2 import RANDOM
-from pandora.host_pb2 import Connection
-from pandora.host_pb2 import DataTypes
-from pandora.host_pb2 import OwnAddressType
 from pandora.security_pb2 import LE_LEVEL3
 from pandora.security_pb2 import LEVEL2
 from pandora.security_pb2 import PairingEventAnswer
@@ -203,38 +200,17 @@ class LeSecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
             nonlocal ref_dut
             nonlocal dut_ref
 
-            # Make LE connection task.
-            async def connect_le(
-                initiator: PandoraDevice,
-                acceptor: PandoraDevice,
-                initiator_addr_type: OwnAddressType,
-                acceptor_addr_type: OwnAddressType,
-            ) -> Tuple[Connection, Connection]:
-                # Acceptor - Advertise
-                advertisement = acceptor.aio.host.Advertise(
-                    legacy=True,
-                    connectable=True,
-                    own_address_type=acceptor_addr_type,
-                    data=DataTypes(manufacturer_specific_data=b'pause cafe'),
-                )
-
-                # Initiator - Scan and fetch the address
-                scan = initiator.aio.host.Scan(own_address_type=initiator_addr_type)
-                acceptor_scan = await anext(
-                    (x async for x in scan if b'pause cafe' in x.data.manufacturer_specific_data)
-                )  # pytype: disable=name-error
-                scan.cancel()
-
-                # Initiator - LE connect
-                return await pandora_snippet.connect_le(initiator, advertisement, acceptor_scan, initiator_addr_type)
-
             # Make LE connection.
             if connect == 'incoming_connection':
                 # DUT is acceptor
-                ref_dut, dut_ref = await connect_le(self.ref, self.dut, ref_address_type, dut_address_type)
+                ref_dut, dut_ref = await pandora_snippet.connect_le_dummy(
+                    self.ref, self.dut, ref_address_type, dut_address_type
+                )
             else:
                 # DUT is initiator
-                dut_ref, ref_dut = await connect_le(self.dut, self.ref, dut_address_type, ref_address_type)
+                dut_ref, ref_dut = await pandora_snippet.connect_le_dummy(
+                    self.dut, self.ref, dut_address_type, ref_address_type
+                )
 
             # Pairing.
 
