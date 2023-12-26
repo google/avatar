@@ -16,6 +16,7 @@ import asyncio
 import avatar
 import itertools
 import logging
+import secrets
 
 from avatar import BumblePandoraDevice
 from avatar import PandoraDevice
@@ -103,6 +104,7 @@ class SecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
                 device.config.setdefault('address_resolution_offload', True)
                 device.config.setdefault('classic_enabled', True)
                 device.config.setdefault('classic_ssp_enabled', True)
+                device.config.setdefault('irk', secrets.token_hex(16))
                 device.config.setdefault(
                     'server',
                     {
