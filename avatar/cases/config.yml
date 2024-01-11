@@ -13,3 +13,11 @@ TestBeds:
     - transport: 'tcp-client:127.0.0.1:6402'
     - transport: 'tcp-client:127.0.0.1:6402'
     - transport: 'tcp-client:127.0.0.1:6402'
+- Name: phy
+  TestParams:
+    scan_timeout: 15.0
+  Controllers:
+    AndroidDevice: '*'
+    BumbleDevice:
+    - transport: 'tcp-client:127.0.0.1:1234'
+    - transport: 'tcp-client:127.0.0.1:1235'
