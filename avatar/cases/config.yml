@@ -13,3 +13,13 @@ TestBeds:
     - transport: 'tcp-client:127.0.0.1:6402'
     - transport: 'tcp-client:127.0.0.1:6402'
     - transport: 'tcp-client:127.0.0.1:6402'
+- Name: usb.ax210
+  Controllers:
+    AndroidDevice: '*'
+    BumbleDevice:
+      - transport: 'pyusb:[driver=intel]8087:0033'
+- Name: usb.be200
+  Controllers:
+    AndroidDevice: '*'
+    BumbleDevice:
+      - transport: 'pyusb:[driver=intel]8087:0036'
