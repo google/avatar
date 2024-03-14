@@ -54,6 +54,7 @@ PANDORA_COMMON_SERVER_CLASSES: Dict[str, Type[pandora_server.PandoraServer[Any]]
     'PandoraDevice': pandora_server.PandoraServer,
     'AndroidDevice': pandora_server.AndroidPandoraServer,
     'BumbleDevice': pandora_server.BumblePandoraServer,
+    'UsbDevice': pandora_server.UsbBumblePandoraServer,
 }
 
 KEY_PANDORA_SERVER_CLASS = 'pandora_server_class'
