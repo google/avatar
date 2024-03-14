@@ -25,6 +25,7 @@ import types
 
 from avatar.controllers import bumble_device
 from avatar.controllers import pandora_device
+from avatar.controllers import usb_bumble_device
 from avatar.pandora_client import BumblePandoraClient
 from avatar.pandora_client import PandoraClient
 from bumble import pandora as bumble_server
@@ -103,6 +104,10 @@ class BumblePandoraServer(PandoraServer[BumblePandoraDevice]):
             self._task = None
 
         avatar.aio.run_until_complete(server_stop())
+
+
+class UsbBumblePandoraServer(BumblePandoraServer):
+    MOBLY_CONTROLLER_MODULE = usb_bumble_device
 
 
 class AndroidPandoraServer(PandoraServer[AndroidDevice]):
