@@ -79,8 +79,7 @@ jobs:
       - name: Install
         run: |
           pip install --upgrade pip
-          pip install rootcanal==1.9.0
-          pip install .
+          pip install .[dev]
       - name: Rootcanal
         run: nohup python -m rootcanal > rootcanal.log &
       - name: Test
