@@ -122,7 +122,6 @@ class LeHostTest(base_test.BaseTestClass):  # type: ignore[misc]
         )
 
         scan = self.dut.host.Scan(legacy=False, passive=False, timeout=self.scan_timeout)
-        report = next((x for x in scan if x.public == self.ref.address))
         try:
             report = next((x for x in scan if x.public == self.ref.address))
 
