@@ -9,10 +9,10 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License"
 ]
 dependencies = [
-    "bt-test-interfaces>=0.0.4",
+    "bt-test-interfaces>=0.0.6",
     "bumble>=0.0.186",
     "protobuf==4.24.2",
-    "grpcio==1.57",
+    "grpcio>=1.62.1",
     "mobly==1.12.2",
     "portpicker>=1.5.2",
 ]
@@ -25,8 +25,8 @@ avatar = "avatar:main"
 
 [project.optional-dependencies]
 dev = [
-    "rootcanal==1.10.0",
-    "grpcio-tools>=1.57",
+    "rootcanal>=1.10.0",
+    "grpcio-tools>=1.62.1",
     "pyright==1.1.298",
     "mypy==1.5.1",
     "black==23.7.0",
