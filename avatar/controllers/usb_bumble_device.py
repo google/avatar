@@ -25,7 +25,7 @@ def create(configs: List[Dict[str, Any]]) -> List[BumblePandoraDevice]:
     """Create a list of `BumbleDevice` from configs."""
 
     def transport_from_id(id: str) -> str:
-        return f'pyusb:{id.removeprefix("usb:")}'
+        return f'pyusb:!{id.removeprefix("usb:")}'
 
     return [BumblePandoraDevice(config={'transport': transport_from_id(config['id'])}) for config in configs]
 
