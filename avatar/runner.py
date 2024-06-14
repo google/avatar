@@ -110,6 +110,9 @@ class SuiteRunner:
         # Enable Bumble snoop logs.
         os.environ.setdefault('BUMBLE_SNOOPER', f'btsnoop:file:{self.logs_dir}/{_BUMBLE_BTSNOOP_FMT}')
 
+        # Set Mobly log path.
+        os.environ.setdefault('ENV_MOBLY_LOGPATH', str(self.logs_dir))
+
         # Execute the suite
         ok = True
         for config in self.test_run_configs:
