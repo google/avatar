@@ -114,15 +114,13 @@ class PandoraClient:
                 await self._aio.channel.close()
                 self._aio = None
 
-                time.sleep(2)
-
                 # This call might fail if the server is unavailable.
                 self._address = Address(
                     (await self.aio.host.ReadLocalAddress(wait_for_ready=True, timeout=15.0)).address
                 )
                 return
             except grpc.aio.AioRpcError as e:
-                if e.code() in (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.DEADLINE_EXCEEDED):
+                if e.code() in (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.DEADLINE_EXCEEDED, grpc.StatusCode.CANCELLED):
                     if attempts <= max_attempts:
                         self.log.debug(f'Server unavailable, retry [{attempts}/{max_attempts}].')
                         attempts += 1
