@@ -23,8 +23,6 @@ import grpc
 import grpc.aio
 import logging
 
-import time
-
 from avatar.metrics.interceptors import aio_interceptors
 from avatar.metrics.interceptors import interceptors
 from bumble import pandora as bumble_server
@@ -120,7 +118,11 @@ class PandoraClient:
                 )
                 return
             except grpc.aio.AioRpcError as e:
-                if e.code() in (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.DEADLINE_EXCEEDED, grpc.StatusCode.CANCELLED):
+                if e.code() in (
+                    grpc.StatusCode.UNAVAILABLE,
+                    grpc.StatusCode.DEADLINE_EXCEEDED,
+                    grpc.StatusCode.CANCELLED,
+                ):
                     if attempts <= max_attempts:
                         self.log.debug(f'Server unavailable, retry [{attempts}/{max_attempts}].')
                         attempts += 1
