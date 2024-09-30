@@ -23,6 +23,8 @@ import grpc
 import grpc.aio
 import logging
 
+import time
+
 from avatar.metrics.interceptors import aio_interceptors
 from avatar.metrics.interceptors import interceptors
 from bumble import pandora as bumble_server
@@ -111,6 +113,8 @@ class PandoraClient:
                 assert self._aio
                 await self._aio.channel.close()
                 self._aio = None
+
+                time.sleep(2)
 
                 # This call might fail if the server is unavailable.
                 self._address = Address(
