@@ -33,6 +33,7 @@ from bumble.pandora.device import PandoraDevice as BumblePandoraDevice
 from contextlib import suppress
 from mobly.controllers import android_device
 from mobly.controllers.android_device import AndroidDevice
+from pathlib import Path
 from typing import Generic, Optional, TypeVar
 
 ANDROID_SERVER_PACKAGE = 'com.android.pandora'
@@ -65,6 +66,11 @@ class PandoraServer(Generic[TDevice]):
 
     def stop(self) -> None:
         """Stops and cleans up the Pandora server on the device."""
+        pass
+
+    def collect_logs(self, path: Path) -> None:
+         """Collects logs from all Pandora servers."""
+        pass
 
 
 class BumblePandoraServer(PandoraServer[BumblePandoraDevice]):
@@ -151,3 +157,6 @@ class AndroidPandoraServer(PandoraServer[AndroidDevice]):
         self.device.adb.forward(['--remove', f'tcp:{self._port}'])  # type: ignore
         self._instrumentation.join()
         self._instrumentation = None
+
+    def collect_logs(self, path: Path) -> None:
+        self.device.take_bug_report(destination=path)  # type: ignore

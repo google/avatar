@@ -37,6 +37,7 @@ from avatar.pandora_server import PandoraServer
 from avatar.runner import SuiteRunner
 from mobly import base_test
 from mobly import signals
+from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Sized, Tuple, Type, TypeVar
 
 # public symbols
@@ -146,6 +147,13 @@ class PandoraDevices(Sized, Iterable[PandoraDevice]):
         for server in self._servers:
             server.stop()
         self._clients.clear()
+
+    def collect_logs(self, path: Path) -> None:
+        """Collects logs from all Pandora servers."""
+        if not len(self._servers):
+            return
+        for server in self._servers:
+            server.collect_logs(path)
 
 
 def _load_pandora_server_class(class_path: str) -> Type[pandora_server.PandoraServer[Any]]:
