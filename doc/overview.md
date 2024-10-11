@@ -143,7 +143,7 @@ The third approach is to start from a code coverage report: uncovered code
 paths are identified and corresponding Avatar tests are implemented to target
 them.
 
-## Extended architecture
+## Extended architecture <a name=extended-architecture></a>
 
 Avatar is capable to handle any setup with multiple devices which implement
 the Pandora APIs. Avatar tests can be run physically or virtually (with
