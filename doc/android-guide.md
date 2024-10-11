@@ -1,3 +1,6 @@
+Project: /pandora/_project.yaml
+Book: /pandora/_book.yaml
+
 # Avatar with Android
 
 Since Android provides an implementation of the [Pandora APIs](
@@ -39,10 +42,21 @@ Note: For Googlers, from an internal Android repository, use the
 `cf_x86_64_phone-userdebug` target instead. You can also use a CF remote
 instance by removing `--local-instance`.
 
-### `avatar` CLI (preferred)
+### `atest` CLI (preferred)
 
-You can run all the existing Avatar tests on Android by running the following
-commands from the root of your Android repository:
+You can run all Avatar tests using [`atest`](
+https://source.android.com/docs/core/tests/development/atest):
+
+```shell
+atest avatar -v # All tests in verbose
+atest avatar:<classA>#<testA> # run a specific test
+atest avatar:<classA>#<testA> avatar:<classA>#<testB> # Run two specific tests
+```
+
+### `avatar` CLI (alternative)
+
+You can also run all the existing Avatar tests on Android by running the
+following commands from the root of your Android repository:
 
 ```shell
 cd packages/modules/Bluetooth
@@ -56,15 +70,6 @@ avatar run --mobly-std-log  # '--mobly-std-log' to print mobly logs, silent othe
 Note: If you have errors such as `ModuleNotFoundError: no module named pip`,
 reset your Avatar cache by doing `rm -rf ~/.cache/avatar/venv`.
 
-### `atest` CLI
-
-You can also run all Avatar tests using [`atest`](
-https://source.android.com/docs/core/tests/development/atest):
-
-```shell
-atest avatar -v # All tests in verbose
-```
-
 ## Build a new Avatar test
 
 Follow the instructions below to create your first Avatar test.
@@ -75,8 +80,6 @@ Create a new Avatar test class file `codelab_test.py` in the Android Avatar
 tests folder, `packages/modules/Bluetooth/android/pandora/test/`:
 
 ```python
-import asyncio # Provides utilities for calling asynchronous functions.
-
 from typing import Optional  # Avatar is strictly typed.
 
 # Importing Mobly modules required for the test.
@@ -92,7 +95,7 @@ from pandora.host_pb2 import RANDOM, DataTypes
 
 
 # The test class to test the LE (Bluetooth Low Energy) Connectivity.
-class CodelabTest(base_test.BaseTestClass): # type: ignore[misc]
+class CodelabTest(base_test.BaseTestClass):
     devices: Optional[PandoraDevices] = None
     dut: PandoraClient
     ref: BumblePandoraClient  # `BumblePandoraClient` is a sub-class of `PandoraClient`
@@ -100,7 +103,7 @@ class CodelabTest(base_test.BaseTestClass): # type: ignore[misc]
     # Method to set up the DUT and REF devices for the test (called once).
     def setup_class(self) -> None:
         self.devices = PandoraDevices(self)  # Create Pandora devices from the config.
-        self.dut, ref, *_ = self.devices
+        self.dut, ref = self.devices
         assert isinstance(ref, BumblePandoraClient)  # REF device is a Bumble device.
         self.ref = ref
 
@@ -145,18 +148,18 @@ index a124306e8f..742e087521 100644
 +_TEST_CLASSES_LIST = [example.ExampleTest, codelab_test.CodelabTest]
 ```
 
-You can now try to run your test class using `avatar`:
-
-```shell
-avatar run --mobly-std-log --include-filter 'CodelabTest'  # All the CodelabTest tests
-avatar run --mobly-std-log --include-filter 'CodelabTest#test_void' # Run only test_void
-```
-
-Or using `atest`:
+You can now try to run your test class using `atest`:
 
 ```shell
 atest avatar -v  # all tests
 atest avatar:'CodelabTest#test_void' -v # Run only test_void
+```
+
+Or using `avatar`:
+
+```shell
+avatar run --mobly-std-log --include-filter 'CodelabTest'  # All the CodelabTest tests
+avatar run --mobly-std-log --include-filter 'CodelabTest#test_void' # Run only test_void
 ```
 
 ### Add a real test
@@ -211,7 +214,7 @@ def test_le_connect_central(self) -> None:
 Then, run your new `test_le_connect_central` test:
 
 ```shell
-avatar run --mobly-std-log --include-filter 'CodelabTest'
+atest avatar:CodelabTest#test_le_connect_central
 ```
 
 ### Implement your own tests
@@ -322,3 +325,4 @@ Android postsubmit tests.
 [avatar-code]: https://cs.android.com/android/platform/superproject/+/main:external/pandora/avatar
 
 [avatar-android-suite-runner-code]: https://cs.android.com/android/platform/superproject/main/+/main:packages/modules/Bluetooth/android/pandora/test/main.py
+
