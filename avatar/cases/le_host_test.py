@@ -112,12 +112,29 @@ class LeHostTest(base_test.BaseTestClass):  # type: ignore[misc]
         scan_response_data = DataTypes() if scannable == 'scannable' else None
         target = self.dut.address if directed == 'directed' else None
 
+        # Advertise with Android and Scan with Bumble to retrieve the address
+        android_advertise = self.dut.host.Advertise(
+            legacy=True,
+            connectable=True,
+            own_address_type=RANDOM,
+            data=DataTypes(manufacturer_specific_data=b'pause cafe'),
+        )
+        bumble_scan = self.ref.host.Scan(legacy=False, passive=False, timeout=self.scan_timeout)
+        result_scan = next((x for x in bumble_scan if b'pause cafe' in x.data.manufacturer_specific_data))  # pytype: disable=name-error
+        android_advertise.cancel()
+        bumble_scan.cancel()
+        logging.error(f'result_scan: {result_scan}')
+        logging.error(f'random address: {result_scan.random.hex()}')
+        target = result_scan.random
+
+        # Perform the test as usual
         advertise = self.ref.host.Advertise(
             legacy=True,
             connectable=is_connectable,
             data=data,  # type: ignore[arg-type]
             scan_response_data=scan_response_data,  # type: ignore[arg-type]
-            public=target,
+            # public=target,
+            random=target,
             own_address_type=PUBLIC,
         )
 
