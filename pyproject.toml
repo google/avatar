@@ -15,6 +15,7 @@ dependencies = [
     "grpcio>=1.62.1",
     "mobly==1.12.2",
     "portpicker>=1.5.2",
+    "numpy"
 ]
 
 [project.urls]
