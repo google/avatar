@@ -81,7 +81,10 @@ class LeHostTest(base_test.BaseTestClass):  # type: ignore[misc]
 
     @avatar.asynchronous
     async def setup_test(self) -> None:  # pytype: disable=wrong-arg-types
-        await asyncio.gather(self.dut.reset(), self.ref.reset())
+        # NOTE: this used to be performed in parallel but can lead to flakiness
+        # (eg. the DUT has re-connect logics and REF reset too fast).
+        await self.dut.reset()
+        await self.ref.reset()
 
     @avatar.parameterized(
         *itertools.product(
