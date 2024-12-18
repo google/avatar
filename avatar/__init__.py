@@ -207,8 +207,8 @@ def parameterized(*inputs: Tuple[Any, ...]) -> Type[Wrapper]:
     return wrapper
 
 
-def enableFlag(flag):
-    """ Enable aconfig flag.
+def enableFlag(flag: str) -> Callable[..., Any]:
+    """Enable aconfig flag.
 
     Requires that the test class declares a devices: Optional[PandoraDevices] attribute.
 
@@ -220,28 +220,20 @@ def enableFlag(flag):
         TypeError: when the provided flag argument is not a string
     """
 
-    def decorator(func):
-
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self: base_test.BaseTestClass, *args: Any, **kwargs: Any) -> Any:
             devices = getattr(self, 'devices', None)
 
             if not devices:
-                raise AttributeError(
-                    "Attribute 'devices' not found in test class or is None")
+                raise AttributeError("Attribute 'devices' not found in test class or is None")
 
             if not isinstance(devices, PandoraDevices):
-                raise TypeError(
-                    "devices attribute must be of a PandoraDevices type")
-
-            if not isinstance(flag, str):
-                raise TypeError("flag must be a string")
+                raise TypeError("devices attribute must be of a PandoraDevices type")
 
             for server in devices._servers:
                 if isinstance(server, pandora_server.AndroidPandoraServer):
-                    server.device.adb.shell(
-                        ['device_config override bluetooth', flag,
-                         'true'])  # type: ignore
+                    server.device.adb.shell(['device_config override bluetooth', flag, 'true'])  # type: ignore
                     break
             return func(self, *args, **kwargs)
 
