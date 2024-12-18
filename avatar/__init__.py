@@ -42,6 +42,7 @@ from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Size
 # public symbols
 __all__ = [
     'asynchronous',
+    'enableFlag',
     'parameterized',
     'rpc_except',
     'PandoraDevices',
@@ -204,6 +205,49 @@ def parameterized(*inputs: Tuple[Any, ...]) -> Type[Wrapper]:
             delattr(owner, name)
 
     return wrapper
+
+
+def enableFlag(flag):
+    """ Enable aconfig flag.
+
+    Requires that the test class declares a devices: Optional[PandoraDevices] attribute.
+
+    Args:
+        flag: aconfig flag name including package, e.g.: 'com.android.bluetooth.flags.<flag_name>'
+
+    Raises:
+        AttributeError: when the 'devices' attribute is not found or not set
+        TypeError: when the provided flag argument is not a string
+    """
+
+    def decorator(func):
+
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            devices = getattr(self, 'devices', None)
+
+            if not devices:
+                raise AttributeError(
+                    "Attribute 'devices' not found in test class or is None")
+
+            if not isinstance(devices, PandoraDevices):
+                raise TypeError(
+                    "devices attribute must be of a PandoraDevices type")
+
+            if not isinstance(flag, str):
+                raise TypeError("flag must be a string")
+
+            for server in devices._servers:
+                if isinstance(server, pandora_server.AndroidPandoraServer):
+                    server.device.adb.shell(
+                        ['device_config override bluetooth', flag,
+                         'true'])  # type: ignore
+                    break
+            return func(self, *args, **kwargs)
+
+        return wrapper
+
+    return decorator
 
 
 _T = TypeVar('_T')
