@@ -61,8 +61,7 @@ def aio_interceptors(device: PandoraClient) -> Sequence[grpc.aio.ClientIntercept
 
 
 class UnaryOutcome(Protocol, Generic[_T_co]):
-    def result(self) -> _T_co:
-        ...
+    def result(self) -> _T_co: ...
 
 
 class UnaryUnaryInterceptor(grpc.UnaryUnaryClientInterceptor):  # type: ignore[misc]
