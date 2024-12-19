@@ -102,8 +102,7 @@ def hook_test(test: BaseTestClass, devices: PandoraDevices) -> None:
 
 
 class AsTrace(Protocol):
-    def as_trace(self) -> TracePacket:
-        ...
+    def as_trace(self) -> TracePacket: ...
 
 
 class Callsite(AsTrace):
@@ -156,11 +155,15 @@ class Callsite(AsTrace):
                 name=self.name,
                 type=TrackEvent.Type.TYPE_SLICE_BEGIN,
                 track_uuid=devices_id[self.device],
-                debug_annotations=None
-                if self.message is None
-                else [
-                    DebugAnnotation(name=self.message.__class__.__name__, dict_entries=debug_message(self.message)[1])
-                ],
+                debug_annotations=(
+                    None
+                    if self.message is None
+                    else [
+                        DebugAnnotation(
+                            name=self.message.__class__.__name__, dict_entries=debug_message(self.message)[1]
+                        )
+                    ]
+                ),
             ),
             trusted_packet_sequence_id=devices_process_id[self.device],
         )
@@ -184,11 +187,15 @@ class CallEvent(AsTrace):
                 name=self.callsite.name,
                 type=TrackEvent.Type.TYPE_INSTANT,
                 track_uuid=devices_id[self.callsite.device],
-                debug_annotations=None
-                if self.message is None
-                else [
-                    DebugAnnotation(name=self.message.__class__.__name__, dict_entries=debug_message(self.message)[1])
-                ],
+                debug_annotations=(
+                    None
+                    if self.message is None
+                    else [
+                        DebugAnnotation(
+                            name=self.message.__class__.__name__, dict_entries=debug_message(self.message)[1]
+                        )
+                    ]
+                ),
             ),
             trusted_packet_sequence_id=devices_process_id[self.callsite.device],
         )
@@ -228,11 +235,15 @@ class CallEnd(CallEvent):
                 name=self.callsite.name,
                 type=TrackEvent.Type.TYPE_SLICE_END,
                 track_uuid=devices_id[self.callsite.device],
-                debug_annotations=None
-                if self.message is None
-                else [
-                    DebugAnnotation(name=self.message.__class__.__name__, dict_entries=debug_message(self.message)[1])
-                ],
+                debug_annotations=(
+                    None
+                    if self.message is None
+                    else [
+                        DebugAnnotation(
+                            name=self.message.__class__.__name__, dict_entries=debug_message(self.message)[1]
+                        )
+                    ]
+                ),
             ),
             trusted_packet_sequence_id=devices_process_id[self.callsite.device],
         )

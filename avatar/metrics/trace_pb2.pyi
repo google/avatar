@@ -64,6 +64,7 @@ class TrackEvent(_message.Message):
         TYPE_SLICE_END: _ClassVar[TrackEvent.Type]
         TYPE_INSTANT: _ClassVar[TrackEvent.Type]
         TYPE_COUNTER: _ClassVar[TrackEvent.Type]
+
     TYPE_UNSPECIFIED: TrackEvent.Type
     TYPE_SLICE_BEGIN: TrackEvent.Type
     TYPE_SLICE_END: TrackEvent.Type
