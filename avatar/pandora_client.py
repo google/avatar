@@ -29,6 +29,8 @@ from bumble import pandora as bumble_server
 from bumble.hci import Address as BumbleAddress
 from bumble.pandora.device import PandoraDevice as BumblePandoraDevice
 from dataclasses import dataclass
+from pandora import asha_grpc
+from pandora import asha_grpc_aio
 from pandora import host_grpc
 from pandora import host_grpc_aio
 from pandora import security_grpc
@@ -142,6 +144,11 @@ class PandoraClient:
     # Pandora interfaces
 
     @property
+    def asha(self) -> asha_grpc.ASHA:
+        """Returns the Pandora ASHA gRPC interface."""
+        return asha_grpc.ASHA(self.channel)
+
+    @property
     def host(self) -> host_grpc.Host:
         """Returns the Pandora Host gRPC interface."""
         return host_grpc.Host(self.channel)
@@ -159,6 +166,11 @@ class PandoraClient:
     @dataclass
     class Aio:
         channel: grpc.aio.Channel
+
+        @property
+        def asha(self) -> asha_grpc_aio.ASHA:
+            """Returns the Pandora ASHA gRPC interface."""
+            return asha_grpc_aio.ASHA(self.channel)
 
         @property
         def host(self) -> host_grpc_aio.Host:
