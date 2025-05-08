@@ -121,6 +121,43 @@ class LeSecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
             Literal['ltk_irk_csrk_lk'],
         ],
     ) -> None:
+        await self.perform_test_le_pairing(
+            connect,
+            pair,
+            ref_address_type_name,
+            variant,
+            ref_io_capability,
+            key_distribution,
+        )
+
+    async def perform_test_le_pairing(
+        self,
+        connect: Union[Literal['outgoing_connection'], Literal['incoming_connection']],
+        pair: Union[Literal['outgoing_pairing'], Literal['incoming_pairing']],
+        ref_address_type_name: Union[Literal['against_random'], Literal['against_public']],
+        variant: Union[
+            Literal['accept'],
+            Literal['accept_ctkd'],
+            Literal['reject'],
+            Literal['rejected'],
+            Literal['disconnect'],
+            Literal['disconnected'],
+        ],
+        ref_io_capability: Union[
+            Literal['against_default_io_cap'],
+            Literal['against_no_output_no_input'],
+            Literal['against_keyboard_only'],
+            Literal['against_display_only'],
+            Literal['against_display_yes_no'],
+            Literal['against_both_display_and_keyboard'],
+        ],
+        key_distribution: Union[
+            Literal['ltk_irk_csrk'],
+            Literal['ltk_irk_csrk_lk'],
+        ],
+    ) -> None:
+        '''This function is a default implementation which could be overriden if needed'''
+
         if self.dut.name == 'android' and connect == 'outgoing_connection' and pair == 'incoming_pairing':
             # TODO: do not skip when doing physical tests.
             raise signals.TestSkip('TODO: Yet to implement the test cases:\n')
