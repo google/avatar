@@ -165,6 +165,32 @@ class SecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
             Literal['against_peripheral'],
         ],
     ) -> None:
+        await self.perform_test_ssp(connect, pair, variant, ref_io_capability, ref_role)
+
+    async def perform_test_ssp(
+        self,
+        connect: Union[Literal['outgoing_connection'], Literal['incoming_connection']],
+        pair: Union[Literal['outgoing_pairing'], Literal['incoming_pairing']],
+        variant: Union[
+            Literal['accept'],
+            Literal['reject'],
+            Literal['rejected'],
+            Literal['disconnect'],
+            Literal['disconnected'],
+            Literal['accept_ctkd'],
+        ],
+        ref_io_capability: Union[
+            Literal['against_default_io_cap'],
+            Literal['against_no_output_no_input'],
+            Literal['against_keyboard_only'],
+            Literal['against_display_only'],
+            Literal['against_display_yes_no'],
+        ],
+        ref_role: Union[
+            Literal['against_central'],
+            Literal['against_peripheral'],
+        ],
+    ) -> None:
         if self.dut.name == 'android' and connect == 'outgoing_connection' and pair == 'incoming_pairing':
             # TODO: do not skip when doing physical tests.
             raise signals.TestSkip(
