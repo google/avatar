@@ -189,7 +189,10 @@ class LeSecurityTest(base_test.BaseTestClass):  # type: ignore[misc]
             raise signals.TestSkip('CTKD requires Security Level 4')
 
         # Factory reset both DUT and REF devices.
-        await asyncio.gather(self.dut.reset(), self.ref.reset())
+        # NOTE: this used to be performed in parallel but can lead to flakiness
+        # (eg. the DUT has re-connect logics and REF reset too fast).
+        await self.dut.reset()
+        await self.ref.reset()
 
         # Override REF IO capability if supported.
         if isinstance(self.ref, BumblePandoraDevice):
