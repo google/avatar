@@ -19,7 +19,11 @@ import asyncio
 import avatar.aio
 import grpc
 import grpc.aio
+import logging
 import portpicker
+import re
+import shlex
+import subprocess
 import threading
 import types
 
@@ -117,6 +121,9 @@ class AndroidPandoraServer(PandoraServer[AndroidDevice]):
 
     _instrumentation: Optional[threading.Thread] = None
     _port: int
+    _logger: logging.Logger
+    _handler: logging.Handler
+    _adb_shell: subprocess.Popen[bytes]
 
     def start(self) -> PandoraClient:
         """Sets up and starts the Pandora server on the Android device."""
@@ -137,6 +144,41 @@ class AndroidPandoraServer(PandoraServer[AndroidDevice]):
         self._instrumentation.start()
         self.device.adb.forward([f'tcp:{self._port}', f'tcp:{ANDROID_SERVER_GRPC_PORT}'])  # type: ignore
 
+        # Forward all logging to ADB logs
+        adb = self.device.adb
+        self._adb_shell = subprocess.Popen(['adb', '-s', adb.serial, 'shell'], stdin=subprocess.PIPE)
+
+        # This regex match all ANSI escape sequences (colors, style, ..).
+        ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+
+        class AdbLoggingHandler(logging.Handler):
+            LOGGING_TO_ANDROID_LEVELS = {
+                logging.FATAL: 'f',
+                logging.ERROR: 'e',
+                logging.WARN: 'w',
+                logging.INFO: 'i',
+                logging.DEBUG: 'd',
+                logging.NOTSET: 'd',
+            }
+
+            def __init__(self, adb_shell: subprocess.Popen[bytes]) -> None:
+                super().__init__()
+                self.adb_shell = adb_shell
+
+            def emit(self, record: logging.LogRecord) -> None:
+                if record.levelno <= logging.DEBUG:
+                    return
+                # Format and remove all ANSI escape sequences.
+                msg = ansi_escape.sub('', self.format(record))
+                level = AdbLoggingHandler.LOGGING_TO_ANDROID_LEVELS[record.levelno]
+                assert self.adb_shell.stdin
+                self.adb_shell.stdin.write(f'log -t Avatar -p {level} {shlex.quote(msg)}\n'.encode('utf-8'))
+                self.adb_shell.stdin.flush()
+
+        self._logger = logging.getLogger()
+        self._handler = AdbLoggingHandler(self._adb_shell)
+        self._logger.addHandler(self._handler)
+
         return PandoraClient(f'localhost:{self._port}', 'android')
 
     def stop(self) -> None:
@@ -147,6 +189,12 @@ class AndroidPandoraServer(PandoraServer[AndroidDevice]):
         self.device.adb._exec_adb_cmd(  # type: ignore
             'shell', f'am force-stop {ANDROID_SERVER_PACKAGE}', shell=False, timeout=None, stderr=None
         )
+
+        # Remove ADB logging handler
+        self._logger.removeHandler(self._handler)
+        assert self._adb_shell.stdin
+        self._adb_shell.stdin.close()
+        self._adb_shell.wait()
 
         self.device.adb.forward(['--remove', f'tcp:{self._port}'])  # type: ignore
         self._instrumentation.join()
