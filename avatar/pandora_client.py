@@ -31,6 +31,8 @@ from bumble.pandora.device import PandoraDevice as BumblePandoraDevice
 from dataclasses import dataclass
 from pandora import host_grpc
 from pandora import host_grpc_aio
+from pandora import l2cap_grpc
+from pandora import l2cap_grpc_aio
 from pandora import security_grpc
 from pandora import security_grpc_aio
 from typing import Any, Dict, MutableMapping, Optional, Tuple, Union
@@ -156,6 +158,11 @@ class PandoraClient:
         """Returns the Pandora SecurityStorage gRPC interface."""
         return security_grpc.SecurityStorage(self.channel)
 
+    @property
+    def l2cap(self) -> l2cap_grpc.L2CAP:
+        """Returns the Pandora SecurityStorage gRPC interface."""
+        return l2cap_grpc.L2CAP(self.channel)
+
     @dataclass
     class Aio:
         channel: grpc.aio.Channel
@@ -174,6 +181,11 @@ class PandoraClient:
         def security_storage(self) -> security_grpc_aio.SecurityStorage:
             """Returns the Pandora SecurityStorage gRPC interface."""
             return security_grpc_aio.SecurityStorage(self.channel)
+
+        @property
+        def l2cap(self) -> l2cap_grpc_aio.L2CAP:
+            """Returns the Pandora SecurityStorage gRPC interface."""
+            return l2cap_grpc_aio.L2CAP(self.channel)
 
     @property
     def aio(self) -> 'PandoraClient.Aio':
